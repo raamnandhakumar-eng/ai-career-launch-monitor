@@ -1,9 +1,11 @@
 """
 Census OCC <-> SOC crosswalk.
 
-CPS microdata code occupation with Census OCC codes (e.g. OCC2010 / OCC2018),
-not SOC. The AEI exposure measure and OEWS are SOC-coded. This module loads the
-official Census OCC->SOC crosswalk and exposes a mapping helper.
+CPS microdata code occupation with Census occupation codes, not SOC. This
+repo's crosswalk is for the contemporary OCC values in 2020+ samples (the 2018
+Census scheme); it must not be used with the harmonized OCC2010 variable. The
+AEI exposure measure and OEWS are SOC-coded. This module loads the official
+Census OCC->SOC crosswalk and exposes a mapping helper.
 
 The crosswalk file itself (an Excel from census.gov) is not bundled. Download it
 once via `fetch()` on a networked machine, or drop it at

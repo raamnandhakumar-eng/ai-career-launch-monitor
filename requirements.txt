@@ -3,3 +3,4 @@ numpy>=1.24
 matplotlib>=3.7
 linearmodels>=6.0
 openpyxl>=3.1
+ipumspy>=0.6.0

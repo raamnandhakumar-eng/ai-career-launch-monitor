@@ -20,11 +20,18 @@ Anthropic Economic Index, labor-market-impacts release (CC-BY 4.0).
 - `cps_panel.csv` — **you build this locally.** Occupation × age employment over time.
   Schema: `year, occ_code, age_band, employed` with
   `age_band ∈ {20-24, 25-29, 30-39, 40-54, 55+}`.
-  Recommended route: download an IPUMS CPS extract, then run:
-  `python -m src.build_cps_panel <extract.csv.gz> --census-occ-column OCC2010`.
-  See `src/download_bls.py` and the repository README.
+  Recommended route: run `python -m src.occupation_crosswalk`, set
+  `IPUMS_API_KEY`, then run `python -m src.build_cps_panel --fetch-ipums
+  --sample asec --start 2020 --end 2025`. Use `--dry-run` first to inspect the
+  extract specification without a key or network call. The API download is
+  temporary; the aggregated panel and metadata are retained locally.
+  A previously downloaded extract can instead be converted with
+  `python -m src.build_cps_panel <extract.csv.gz> --census-occ-column OCC`.
+  This repo's crosswalk expects contemporary `OCC` codes from 2020 onward, not
+  harmonized `OCC2010` codes. See `src/download_bls.py` and the main README.
 - `cps_panel.metadata.json` — source filename, year/month coverage, mapping
-  method, match rate, and partial-year flags.
+  method, match rate, partial-year flags, and (for API builds) the non-sensitive
+  extract specification and unavailable-sample list.
 
 ## `raw/onet/` — fetched
 O*NET Job Zones and Education/Training files (`python -m src.download_onet`),

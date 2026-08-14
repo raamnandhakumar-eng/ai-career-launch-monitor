@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.build_cps_panel import age_band, normalize_soc, transform
+from src.build_cps_panel import (
+    age_band,
+    available_sample_ids,
+    candidate_sample_ids,
+    ipums_extract_spec,
+    normalize_soc,
+    transform,
+)
 from src.build_panel import young_worker_panel
 from src.data_guard import is_synthetic_panel
 from src.elsi import calculate
@@ -25,6 +32,43 @@ class CpsBuilderTests(unittest.TestCase):
         self.assertEqual(normalize_soc(151252), "15-1252")
         self.assertIsNone(normalize_soc("not-a-code"))
 
+    def test_asec_extract_spec_uses_current_occ_and_weight(self):
+        spec = ipums_extract_spec(2020, 2022, "asec")
+        self.assertEqual(
+            spec["samples"],
+            ["cps2020_03s", "cps2021_03s", "cps2022_03s"],
+        )
+        self.assertIn("OCC", spec["variables"])
+        self.assertNotIn("OCC2010", spec["variables"])
+        self.assertEqual(spec["weight"], "ASECWT")
+        self.assertEqual(spec["frequency"], "annual")
+
+    def test_basic_sample_selection_skips_unpublished_months(self):
+        published = {
+            sample_id: {}
+            for sample_id in candidate_sample_ids(2025, 2025, "basic")
+            if sample_id != "cps2025_10b"
+        }
+        selected = available_sample_ids(2025, 2025, "basic", published)
+        self.assertEqual(len(selected), 11)
+        self.assertNotIn("cps2025_10b", selected)
+
+    def test_automated_crosswalk_route_rejects_pre_2020(self):
+        with self.assertRaisesRegex(ValueError, "2020 or later"):
+            candidate_sample_ids(2019, 2020, "asec")
+
+    def test_repo_crosswalk_rejects_occ2010(self):
+        raw = pd.DataFrame({
+            "YEAR": [2024],
+            "MONTH": [1],
+            "AGE": [24],
+            "EMPSTAT": [10],
+            "WTFINL": [100],
+            "OCC2010": [4700],
+        })
+        with self.assertRaisesRegex(ValueError, "2010-basis"):
+            transform(raw, census_occ_column="OCC2010")
+
     def test_monthly_weights_become_annual_average(self):
         raw = pd.DataFrame({
             "YEAR": [2024] * 4,
@@ -44,6 +88,24 @@ class CpsBuilderTests(unittest.TestCase):
         self.assertEqual(by_band["20-24"], 110)
         self.assertEqual(by_band["30-39"], 290)
         self.assertEqual(metadata["month_coverage"], {"2024": [1, 2]})
+
+    def test_contemporary_occ_maps_to_dashed_soc(self):
+        raw = pd.DataFrame({
+            "YEAR": [2024],
+            "MONTH": [1],
+            "AGE": [24],
+            "EMPSTAT": [10],
+            "WTFINL": [100],
+            "OCC": [4700],
+        })
+        with tempfile.TemporaryDirectory() as temp_dir:
+            crosswalk = Path(temp_dir) / "crosswalk.csv"
+            pd.DataFrame({
+                "occ_census": ["4700"],
+                "occ_code": ["41-2031"],
+            }).to_csv(crosswalk, index=False)
+            panel, _ = transform(raw, crosswalk_path=crosswalk, min_match_rate=1)
+        self.assertEqual(panel.loc[0, "occ_code"], "41-2031")
 
 
 class PanelTests(unittest.TestCase):
@@ -85,4 +147,3 @@ class ElsiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

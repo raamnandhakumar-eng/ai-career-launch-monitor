@@ -46,7 +46,7 @@ young-worker result becomes available only after adding a real CPS extract.
 |---|---|---:|---:|
 | Observed AI exposure | Anthropic Economic Index | Vendored, real | Yes, descriptives only |
 | Employment and wages | BLS May 2025 OEWS | Download script | Not yet |
-| Occupation × age × time | CPS via an IPUMS extract | User builds locally | Not yet |
+| Occupation × age × time | CPS via IPUMS | One-command API build; output stays local | Not yet |
 | Entry requirements | O*NET 30.3 | Download script | Not yet |
 
 Raw IPUMS extracts and generated CPS panels are excluded from Git because of
@@ -89,17 +89,35 @@ python -m unittest discover -s tests -v
 
 ### Build the real young-worker panel
 
-1. Create an IPUMS CPS basic-monthly extract for the analysis window. Include
-   `YEAR`, `MONTH`, `AGE`, `EMPSTAT`, `WTFINL`, and a consistent occupation
-   variable such as `OCC2010`.
-2. Download the official occupation crosswalk.
-3. Convert the extract with one command.
+The recommended route submits a real IPUMS CPS extract, waits for it, downloads
+it to a temporary directory, validates the occupation mapping, and writes the
+analysis-ready panel. A free IPUMS API key is required.
+
+```bash
+python -m src.occupation_crosswalk
+export IPUMS_API_KEY=your_key_from_account.ipums.org
+
+# Inspect the non-sensitive extract specification without a key or API call.
+python -m src.build_cps_panel --dry-run \
+  --sample asec --start 2020 --end 2025
+
+# Submit ASEC 2020–2025 and build data/raw/bls/cps_panel.csv.
+python -m src.build_cps_panel --fetch-ipums \
+  --sample asec --start 2020 --end 2025
+```
+
+ASEC is the complete-year default and uses `ASECWT`. For a preliminary read
+from released basic-monthly files, use `--sample basic`; the script queries the
+published IPUMS sample catalog, skips unavailable months, averages monthly
+weighted stocks, and records exact coverage and partial-year flags.
+
+To convert a previously downloaded basic-monthly extract instead:
 
 ```bash
 python -m src.occupation_crosswalk
 
 python -m src.build_cps_panel data/raw/bls/cps_extract.csv.gz \
-  --census-occ-column OCC2010 \
+  --census-occ-column OCC \
   --frequency monthly
 ```
 
@@ -110,6 +128,10 @@ python -m src.build_cps_panel data/raw/bls/cps_extract.csv.gz \
   --soc-column OCCSOC \
   --frequency monthly
 ```
+
+For the repo's current 2018 Census OCC-to-SOC crosswalk, use contemporary
+`OCC` from 2020 onward. Do not pass the harmonized `OCC2010` variable through
+that crosswalk; earlier years require a vintage-matched crosswalk.
 
 The converter:
 
@@ -158,9 +180,10 @@ The baseline specification is:
 young_share[o,t] = β(AI_exposure[o] × Post[t]) + occupation FE + year FE + ε[o,t]
 ```
 
-`young_share` is the age-20–29 share of employment in occupation `o` and year
-`t`. Standard errors are clustered by occupation. The event study interacts
-exposure with each year and omits the last pre-period year by default.
+`young_share` is the age-20–29 share of employment among workers age 20 or
+older in occupation `o` and year `t`. Standard errors are clustered by
+occupation. The event study interacts exposure with each year and omits the
+last pre-period year by default.
 
 Primary diagnostics should include:
 
@@ -238,4 +261,3 @@ ai-career-launch-monitor/
 4. Add robustness and matched-month specifications.
 5. Pre-register the primary outcome, exposure measure, window, and exclusions.
 6. Add policy simulations only after the descriptive estimates are stable.
-
