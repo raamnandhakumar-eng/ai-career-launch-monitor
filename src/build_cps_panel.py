@@ -330,7 +330,12 @@ def transform(
             int(year) for year, months in coverage.items() if len(months) < 12
         ],
         "age_universe": "employed people age 20 or older",
-        "note": "Monthly files are converted to annual-average employment by averaging monthly weighted stocks.",
+        "note": (
+            "Monthly files are converted to annual-average employment by averaging "
+            "monthly weighted stocks."
+            if frequency == "monthly"
+            else "ASEC person weights are summed within occupation, year, and age band."
+        ),
     }
     return panel, metadata
 

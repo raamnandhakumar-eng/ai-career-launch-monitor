@@ -7,9 +7,9 @@ This project measures whether young workers are losing share in occupations
 with high observed AI exposure. It focuses on entry-level career pathways,
 wages, and the occupations that absorb new graduates.
 
-> **Research status:** the exposure descriptives below use real Anthropic data.
-> The repo does not yet report a young-worker effect because no real CPS extract
-> is committed. Synthetic data can test the code, but it cannot produce a finding.
+> **Status:** The exposure analysis uses real Anthropic data. The young-worker
+> pipeline has now been run on IPUMS CPS ASEC 2020–2025. CPS files stay local;
+> the chart below reports aggregate results only.
 
 ## Research question
 
@@ -23,7 +23,7 @@ finds no broad unemployment effect so far, but reports tentative evidence that
 job starts among workers aged 22–25 slowed in highly exposed occupations. This
 repository asks a related question about occupational entry and age composition.
 
-## What is real now
+## Exposure snapshot
 
 The vendored Anthropic Economic Index file contains 756 detailed SOC occupations:
 
@@ -37,8 +37,25 @@ The vendored Anthropic Economic Index file contains 756 detailed SOC occupations
 
 ![Observed AI exposure by occupation](figures/exposure_by_major_group.png)
 
-These are exposure facts, not evidence that employment has fallen. The
-young-worker result becomes available only after adding a real CPS extract.
+These exposure facts do not show that employment has fallen.
+
+## First CPS result
+
+The real run produced 13,279 occupation-age-year cells. It matched 93.3% of
+employed records to detailed SOC occupations and linked 364 occupations to the
+Anthropic exposure data.
+
+- Weighted descriptive slope: **-5.7 percentage points per unit of exposure**.
+- Fixed-effects estimate for `exposure × post-2024`: **-0.0576**
+  (SE **0.0248**, p = **0.020**, N = **2,187**).
+- The event study does not show a clean 2024 break. This is an early-warning
+  association, not evidence that AI caused the change.
+
+![Young-worker share change versus AI exposure](figures/young_worker_effect.png)
+
+Larger occupations flagged by ELSI include Market Research Analysts, Data Entry
+Keyers, Customer Service Representatives, Graphic Designers, Computer
+Programmers, and Accountants and Auditors. Small occupation cells remain noisy.
 
 ## Data status
 
@@ -46,7 +63,7 @@ young-worker result becomes available only after adding a real CPS extract.
 |---|---|---:|---:|
 | Observed AI exposure | Anthropic Economic Index | Vendored, real | Yes, descriptives only |
 | Employment and wages | BLS May 2025 OEWS | Download script | Not yet |
-| Occupation × age × time | CPS via IPUMS | One-command API build; output stays local | Not yet |
+| Occupation × age × time | CPS via IPUMS | Real ASEC 2020–2025 run; output stays local | Yes, early-warning analysis |
 | Entry requirements | O*NET 30.3 | Download script | Not yet |
 
 Raw IPUMS extracts and generated CPS panels are excluded from Git because of
@@ -136,7 +153,7 @@ that crosswalk; earlier years require a vintage-matched crosswalk.
 The converter:
 
 - keeps employed records using `EMPSTAT ∈ {10, 12}` by default;
-- applies `WTFINL` person weights;
+- applies `ASECWT` for ASEC or `WTFINL` for basic-monthly extracts;
 - creates the age bands `20-24`, `25-29`, `30-39`, `40-54`, and `55+`;
 - converts monthly weighted employment stocks to annual monthly averages;
 - rejects occupation match rates below 80%;
@@ -255,9 +272,8 @@ ai-career-launch-monitor/
 
 ## Next research milestones
 
-1. Build and audit the real CPS panel.
-2. Add uncertainty rules and occupation-cell thresholds.
-3. Add wage outcomes from OEWS and CPS.
-4. Add robustness and matched-month specifications.
-5. Pre-register the primary outcome, exposure measure, window, and exclusions.
-6. Add policy simulations only after the descriptive estimates are stable.
+1. Add uncertainty rules and occupation-cell thresholds.
+2. Add wage outcomes from OEWS and CPS.
+3. Add robustness and matched-month specifications.
+4. Pre-register the primary outcome, exposure measure, window, and exclusions.
+5. Add policy simulations only after the descriptive estimates are stable.

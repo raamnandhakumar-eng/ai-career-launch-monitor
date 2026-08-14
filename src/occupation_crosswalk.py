@@ -32,6 +32,44 @@ CENSUS_XWALK_URL = (
 LOCAL_XWALK = RAW_BLS / "census_occ_soc_crosswalk.csv"
 
 
+def _parse_sheets(sheets: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Find and normalize the 2018 Census OCC-to-SOC table in a workbook."""
+    for sheet in sheets.values():
+        for header_row in range(min(30, len(sheet))):
+            labels = sheet.iloc[header_row].fillna("").astype(str).str.lower()
+            occ_candidates = [
+                i
+                for i, label in labels.items()
+                if "census" in label
+                and "code" in label
+                and "soc" not in label
+                and "title" not in label
+            ]
+            soc_candidates = [
+                i for i, label in labels.items() if "soc" in label and "code" in label
+            ]
+            if not occ_candidates or not soc_candidates:
+                continue
+            occ_c, soc_c = occ_candidates[0], soc_candidates[0]
+            rows = sheet.iloc[header_row + 1:, [occ_c, soc_c]].copy()
+            rows.columns = ["occ_census", "soc_raw"]
+            records = []
+            for _, row in rows.dropna(how="all").iterrows():
+                occ_raw = str(row["occ_census"]).strip()
+                census_match = re.fullmatch(r"\d{4}", occ_raw)
+                soc_matches = re.findall(r"\b\d{2}-\d{4}\b", str(row["soc_raw"]))
+                if census_match:
+                    records.extend((census_match.group(0), soc) for soc in soc_matches)
+            if records:
+                return (
+                    pd.DataFrame(records, columns=["occ_census", "occ_code"])
+                    .drop_duplicates()
+                    .sort_values(["occ_census", "occ_code"])
+                    .reset_index(drop=True)
+                )
+    raise RuntimeError("Could not locate OCC/SOC columns in crosswalk workbook.")
+
+
 def fetch():
     """Download the Census crosswalk and normalise to (occ_census, occ_code)."""
     print(f"Fetching Census OCC<->SOC crosswalk ...")
@@ -43,31 +81,9 @@ def fetch():
     # The workbook has a sheet mapping Census codes to 2018 SOC. Column names
     # vary by vintage, so we locate them heuristically.
     xls = pd.read_excel(dst, sheet_name=None, dtype=str, header=None)
-    for sheet in xls.values():
-        for header_row in range(min(30, len(sheet))):
-            labels = sheet.iloc[header_row].fillna("").astype(str).str.lower()
-            occ_candidates = [i for i, label in labels.items()
-                              if "census" in label and "occupation" in label and "code" in label]
-            soc_candidates = [i for i, label in labels.items()
-                              if "soc" in label and "code" in label]
-            if not occ_candidates or not soc_candidates:
-                continue
-            occ_c, soc_c = occ_candidates[0], soc_candidates[0]
-            rows = sheet.iloc[header_row + 1:, [occ_c, soc_c]].copy()
-            rows.columns = ["occ_census", "soc_raw"]
-            records = []
-            for _, row in rows.dropna(how="all").iterrows():
-                census_match = re.search(r"\b(\d{4})\b", str(row["occ_census"]))
-                soc_matches = re.findall(r"\b\d{2}-\d{4}\b", str(row["soc_raw"]))
-                if census_match:
-                    records.extend((census_match.group(1), soc) for soc in soc_matches)
-            if records:
-                out = pd.DataFrame(records, columns=["occ_census", "occ_code"])
-                out = out.drop_duplicates().sort_values(["occ_census", "occ_code"])
-                out.to_csv(LOCAL_XWALK, index=False)
-                print(f"  wrote {LOCAL_XWALK} ({len(out)} rows)")
-                return
-    raise RuntimeError("Could not locate OCC/SOC columns in crosswalk workbook.")
+    out = _parse_sheets(xls)
+    out.to_csv(LOCAL_XWALK, index=False)
+    print(f"  wrote {LOCAL_XWALK} ({len(out)} rows)")
 
 
 @lru_cache(maxsize=1)

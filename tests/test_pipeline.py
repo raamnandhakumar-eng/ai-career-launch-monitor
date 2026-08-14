@@ -15,6 +15,7 @@ from src.build_cps_panel import (
 from src.build_panel import young_worker_panel
 from src.data_guard import is_synthetic_panel
 from src.elsi import calculate
+from src.occupation_crosswalk import _parse_sheets
 
 
 class CpsBuilderTests(unittest.TestCase):
@@ -106,6 +107,22 @@ class CpsBuilderTests(unittest.TestCase):
             }).to_csv(crosswalk, index=False)
             panel, _ = transform(raw, crosswalk_path=crosswalk, min_match_rate=1)
         self.assertEqual(panel.loc[0, "occ_code"], "41-2031")
+
+    def test_official_crosswalk_headers_and_ranges(self):
+        sheet = pd.DataFrame([
+            [None, "2018 Census Title", "2018 Census Code", "2018 SOC Code"],
+            [None, "Category heading", "0010-3550", "11-0000 - 29-0000"],
+            [None, "Chief executives", "0010", "11-1011"],
+            [None, "General and operations managers", "0020", "11-1021"],
+        ])
+        out = _parse_sheets({"2018 Census Occ Code List": sheet})
+        self.assertEqual(
+            out.to_dict("records"),
+            [
+                {"occ_census": "0010", "occ_code": "11-1011"},
+                {"occ_census": "0020", "occ_code": "11-1021"},
+            ],
+        )
 
 
 class PanelTests(unittest.TestCase):
