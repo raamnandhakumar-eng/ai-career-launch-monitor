@@ -31,48 +31,81 @@ def main():
 
     grp = (df.groupby("soc_major_label")["ai_exposure"]
              .mean().sort_values())
+    share_zero = (df["ai_exposure"] == 0).mean()
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(13, 7.2),
-                                   gridspec_kw={"width_ratios": [1.15, 1]})
+    # A vertical layout keeps every occupation label readable when the image is
+    # displayed at GitHub README width.
+    fig = plt.figure(figsize=(12, 14.2), layout="constrained")
+    fig.set_constrained_layout_pads(h_pad=0.16, hspace=0.08)
+    grid = fig.add_gridspec(3, 1, height_ratios=[0.28, 2.05, 1.55])
+    header = fig.add_subplot(grid[0])
+    axL = fig.add_subplot(grid[1])
+    axR = fig.add_subplot(grid[2])
+
+    header.axis("off")
+    fig.text(
+        0.035, 0.982,
+        "Where observed AI use is concentrated across U.S. occupations",
+        fontsize=19, fontweight="bold", color=INK, ha="left", va="top",
+    )
+    fig.text(
+        0.035, 0.953,
+        f"Anthropic Economic Index  |  {len(df)} SOC occupations  |  "
+        f"{share_zero:.0%} show zero observed usage",
+        fontsize=11, color=MUTE, ha="left", va="top",
+    )
 
     # --- Left: mean exposure by SOC major group ---
     colors = [ACCENT if v >= 0.15 else MUTE for v in grp.values]
     axL.barh(grp.index, grp.values, color=colors, height=0.72)
-    axL.set_title("Observed AI exposure by occupation group",
-                  fontsize=12, fontweight="bold", color=INK, loc="left")
-    axL.set_xlabel("Unweighted mean exposure (share of tasks seen in Claude use)")
-    axL.tick_params(length=0)
-    for s in ("top", "right"):
+    axL.set_title("Mean exposure by occupation group",
+                  fontsize=14, fontweight="bold", color=INK, loc="left", pad=18)
+    axL.text(
+        0, 1.005,
+        "Unweighted mean across detailed occupations in each SOC group",
+        transform=axL.transAxes, fontsize=9.5, color=MUTE, va="bottom",
+    )
+    axL.set_xlabel("Observed exposure (share of occupational tasks seen in Claude use)",
+                   labelpad=10)
+    axL.set_xlim(0, 0.42)
+    axL.tick_params(axis="y", length=0, labelsize=10.5)
+    axL.tick_params(axis="x", length=0, labelsize=9.5)
+    axL.xaxis.grid(True, color="#e8e8ee", linewidth=0.8)
+    axL.set_axisbelow(True)
+    for s in ("top", "right", "left"):
         axL.spines[s].set_visible(False)
     for y, v in enumerate(grp.values):
-        axL.text(v + 0.004, y, f"{v:.2f}", va="center", fontsize=8, color=INK)
+        axL.text(max(v + 0.004, 0.006), y, f"{v:.2f}", va="center",
+                 fontsize=9, color=INK)
 
-    # --- Right: most- and least-exposed detailed occupations ---
+    # --- Bottom: most-exposed detailed occupations ---
     top = df.nlargest(12, "ai_exposure")[::-1]
-    labels = top["title"].map(lambda s: textwrap.fill(s, width=35))
+    labels = top["title"].map(lambda s: textwrap.fill(s, width=62))
     axR.barh(labels, top["ai_exposure"],
              color=ACCENT, height=0.72)
     axR.set_title("Most-exposed detailed occupations",
-                  fontsize=12, fontweight="bold", color=INK, loc="left")
-    axR.set_xlabel("Observed exposure")
-    axR.tick_params(length=0)
-    axR.tick_params(axis="y", labelsize=8.5)
-    for s in ("top", "right"):
+                  fontsize=14, fontweight="bold", color=INK, loc="left", pad=18)
+    axR.text(
+        0, 1.005,
+        "Detailed 2018 SOC occupations ranked by observed exposure",
+        transform=axR.transAxes, fontsize=9.5, color=MUTE, va="bottom",
+    )
+    axR.set_xlabel("Observed exposure", labelpad=10)
+    axR.set_xlim(0, 0.80)
+    axR.tick_params(axis="y", length=0, labelsize=10)
+    axR.tick_params(axis="x", length=0, labelsize=9.5)
+    axR.xaxis.grid(True, color="#e8e8ee", linewidth=0.8)
+    axR.set_axisbelow(True)
+    for label in axR.get_yticklabels():
+        label.set_linespacing(0.95)
+    for s in ("top", "right", "left"):
         axR.spines[s].set_visible(False)
     for y, v in enumerate(top["ai_exposure"].values):
-        axR.text(v + 0.006, y, f"{v:.2f}", va="center", fontsize=8, color=INK)
-
-    share_zero = (df["ai_exposure"] == 0).mean()
-    fig.suptitle("Where observed Claude use maps onto U.S. occupations",
-                 x=0.012, ha="left", fontsize=15, fontweight="bold", color=INK)
-    fig.text(0.012, 0.945,
-             f"Anthropic Economic Index, labor-market-impacts release  |  "
-             f"{len(df)} SOC occupations  |  {share_zero:.0%} show zero observed usage",
-             ha="left", fontsize=9.5, color=MUTE)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
+        axR.text(v + 0.009, y, f"{v:.2f}", va="center", fontsize=9, color=INK)
 
     out = FIGURES / "exposure_by_major_group.png"
-    fig.savefig(out, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
     print(f"Saved {out}")
 
     print("\nMost exposed:")
