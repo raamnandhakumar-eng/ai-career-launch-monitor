@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this research software, please cite it using this metadata."
+title: "AI Career Launch Monitor"
+type: software
+authors:
+  - family-names: Nandhakumar
+    given-names: Sriramkrishnan
+repository-code: "https://github.com/raamnandhakumar-eng/ai-career-launch-monitor"
+license: MIT
+version: 0.1.0
+date-released: 2026-08-14
+
