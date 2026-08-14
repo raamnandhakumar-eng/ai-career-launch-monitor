@@ -39,16 +39,25 @@ def download_oews():
 CPS_INSTRUCTIONS = """
 CPS occupation x age panel -- build once, then it feeds build_panel.py.
 
-Route A (recommended, reproducible): IPUMS CPS extract
-    - Register at cps.ipums.org and get an API key.
-    - Request the ASEC or basic-monthly samples for your window (e.g. 2019-2026)
-      with variables: YEAR, AGE, OCC2010 (or OCC), EMPSTAT, WTFINL/ASECWT.
+Route A (recommended, reproducible): automated IPUMS CPS API extract
+    - Register at cps.ipums.org and set IPUMS_API_KEY.
     - Run `python -m src.occupation_crosswalk` once.
-    - Convert the downloaded extract with one command:
+    - Inspect the request without a key or API call:
+      python -m src.build_cps_panel --dry-run \\
+          --sample asec --start 2020 --end 2025
+    - Submit, download, validate, aggregate, and write the panel:
+      python -m src.build_cps_panel --fetch-ipums \\
+          --sample asec --start 2020 --end 2025
+    - ASEC uses ASECWT. `--sample basic` uses WTFINL, checks the published
+      sample catalog, skips unavailable months, and records exact coverage.
+    - The automated OCC->2018 SOC route deliberately rejects pre-2020 years.
+
+Route A2: convert an existing extract
+    - Request YEAR, MONTH, AGE, OCC, EMPSTAT, and WTFINL for 2020+ basic-monthly
+      files, then run:
       python -m src.build_cps_panel data/raw/bls/cps_extract.csv.gz \\
-          --census-occ-column OCC2010 --frequency monthly
-    - The converter applies person weights, age bands, and the OCC->SOC map,
-      then writes data/raw/bls/cps_panel.csv plus provenance metadata.
+          --census-occ-column OCC --frequency monthly
+    - Do not map harmonized OCC2010 through the repo's 2018 Census crosswalk.
 
 Route B (no key): BLS CPS public tables
     - Employment by detailed occupation and age is available in the annual CPS
