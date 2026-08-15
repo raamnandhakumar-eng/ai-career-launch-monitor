@@ -15,5 +15,7 @@ data/processed/panel_metadata.json
 data/processed/elsi*.csv
 data/processed/regression_*.csv
 data/processed/event_study*.csv
+data/processed/headline_series_SYNTHETIC.csv
+data/processed/robustness_summary_SYNTHETIC.csv
 figures/*_SYNTHETIC.png
 .DS_Store

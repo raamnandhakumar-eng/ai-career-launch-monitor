@@ -18,8 +18,10 @@ Anthropic Economic Index, labor-market-impacts release (CC-BY 4.0).
 - `census_occ_soc_crosswalk.csv` — Census OCC→SOC map
   (`python -m src.occupation_crosswalk`).
 - `cps_panel.csv` — **you build this locally.** Occupation × age employment over time.
-  Schema: `year, occ_code, age_band, employed` with
+  Schema: `year, occ_code, age_band, employed, sample_n` with
   `age_band ∈ {20-24, 25-29, 30-39, 40-54, 55+}`.
+  `sample_n` is the unweighted CPS person-record count. Older panels without
+  this column still run, but precision flags are marked unavailable.
   Recommended route: run `python -m src.occupation_crosswalk`, set
   `IPUMS_API_KEY`, then run `python -m src.build_cps_panel --fetch-ipums
   --sample asec --start 2020 --end 2025`. Use `--dry-run` first to inspect the
@@ -41,8 +43,11 @@ Source: https://www.onetcenter.org/database.html
 ## `processed/` — generated
 - `exposure.csv` — exposure + SOC major group + quartiles (`build_exposure.py`)
 - `panel_long.csv` — occ × year × age_band shares (`build_panel.py`)
-- `panel_occ.csv` — one row per occupation, incl. young-share change
+- `panel_occ.csv` — occupation outcomes, including young-share change and young
+  workers per 100,000 employed young workers
 - `elsi.csv` — Entry-Level Squeeze Index rankings (`elsi.py`, real input only)
+- `headline_series.csv` — aggregate young-employment indices by exposure group
+- `robustness_summary.csv` — age, placebo, leave-out, and trend checks
 - Files ending in `_SYNTHETIC` are plumbing outputs and are not findings.
 
 ## Provenance / integrity note

@@ -50,6 +50,10 @@ def _load_cps() -> pd.DataFrame:
     cps["employed"] = pd.to_numeric(cps["employed"], errors="raise")
     if cps["employed"].isna().any() or (cps["employed"] < 0).any():
         sys.exit("cps_panel.csv employed must be non-negative and non-missing")
+    if "sample_n" in cps:
+        cps["sample_n"] = pd.to_numeric(cps["sample_n"], errors="raise")
+        if cps["sample_n"].isna().any() or (cps["sample_n"] < 0).any():
+            sys.exit("cps_panel.csv sample_n must be non-negative and non-missing")
     return cps
 
 
@@ -59,13 +63,25 @@ def young_worker_panel(cps: pd.DataFrame) -> pd.DataFrame:
     work["young_employed"] = work["employed"].where(
         work["age_band"].isin(YOUNG), 0
     )
-    out = (work.groupby(["year", "occ_code"], as_index=False)
-               .agg(employed=("employed", "sum"),
-                    young_employed=("young_employed", "sum")))
+    aggregations = {
+        "employed": ("employed", "sum"),
+        "young_employed": ("young_employed", "sum"),
+    }
+    if "sample_n" in work:
+        work["young_sample_n"] = work["sample_n"].where(
+            work["age_band"].isin(YOUNG), 0
+        )
+        aggregations.update({
+            "sample_n": ("sample_n", "sum"),
+            "young_sample_n": ("young_sample_n", "sum"),
+        })
+    out = work.groupby(["year", "occ_code"], as_index=False).agg(**aggregations)
     if (out["employed"] <= 0).any():
         bad = out.loc[out["employed"] <= 0, ["year", "occ_code"]]
         raise ValueError(f"occupation-year cells must have positive employment: {bad.head().to_dict('records')}")
     out["young_share"] = out["young_employed"] / out["employed"]
+    year_young_total = out.groupby("year")["young_employed"].transform("sum")
+    out["young_per_100k"] = 100_000 * out["young_employed"] / year_young_total
     return out
 
 
@@ -101,13 +117,25 @@ def build(baseline: int, recent: int, allow_partial_year: bool = False) -> pd.Da
     # young-worker share per occupation-year
     young = young_worker_panel(cps)
 
-    b = young[young.year == baseline][["occ_code", "young_share"]].rename(
-        columns={"young_share": "young_share_base"})
-    r = young[young.year == recent][["occ_code", "young_share"]].rename(
-        columns={"young_share": "young_share_recent"})
+    panel_cols = ["occ_code", "young_share", "young_per_100k"]
+    if "young_sample_n" in young:
+        panel_cols.append("young_sample_n")
+    b = young[young.year == baseline][panel_cols].rename(columns={
+        "young_share": "young_share_base",
+        "young_per_100k": "young_per_100k_base",
+        "young_sample_n": "young_sample_n_base",
+    })
+    r = young[young.year == recent][panel_cols].rename(columns={
+        "young_share": "young_share_recent",
+        "young_per_100k": "young_per_100k_recent",
+        "young_sample_n": "young_sample_n_recent",
+    })
     occ = (exp.merge(b, on="occ_code", how="left")
               .merge(r, on="occ_code", how="left"))
     occ["young_share_change"] = occ["young_share_recent"] - occ["young_share_base"]
+    occ["young_per_100k_change"] = (
+        occ["young_per_100k_recent"] - occ["young_per_100k_base"]
+    )
 
     # occupation size (recent total employment) for weighting
     size = (cps[cps.year == recent].groupby("occ_code")["employed"].sum()
@@ -120,6 +148,11 @@ def build(baseline: int, recent: int, allow_partial_year: bool = False) -> pd.Da
         "baseline_year": baseline,
         "recent_year": recent,
         "young_age_definition": "20-29",
+        "entry_proxy_definition": (
+            "Occupation's young employment per 100,000 employed people age 20-29; "
+            "this is a distributional proxy, not a direct inflow measure."
+        ),
+        "sample_counts_available": "sample_n" in cps,
         "synthetic": is_synthetic_panel(),
         "matched_occupations": int(occ["young_share_change"].notna().sum()),
         "exposure_occupations": int(len(exp)),

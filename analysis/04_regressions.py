@@ -25,10 +25,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.config import PROCESSED  # noqa: E402
+from src.config import FIGURES, PROCESSED  # noqa: E402
 from src.data_guard import guard_publication  # noqa: E402
 
 YOUNG = {"20-24", "25-29"}
@@ -46,6 +47,10 @@ def _young_panel() -> pd.DataFrame:
     if (y["employed"] <= 0).any():
         raise ValueError("All occupation-year cells must have positive employment")
     y["young_share"] = y["young_employed"] / y["employed"]
+    y["young_per_100k"] = (
+        100_000 * y["young_employed"]
+        / y.groupby("year")["young_employed"].transform("sum")
+    )
     return y.merge(exp[["occ_code", "ai_exposure", "soc_major_label"]], on="occ_code")
 
 
@@ -66,49 +71,109 @@ def run(post_from: int, base_year: int | None = None,
         raise ValueError(f"base year {base_year} is not in the panel: {years}")
     df["post"] = (df["year"] >= post_from).astype(int)
     df["exp_x_post"] = df["ai_exposure"] * df["post"]
-    df = df.set_index(["occ_code", "year"])
 
-    # --- baseline DiD ---
-    m = PanelOLS.from_formula(
-        "young_share ~ exp_x_post + EntityEffects + TimeEffects", data=df)
-    res = m.fit(cov_type="clustered", cluster_entity=True)
-    print("=" * 66)
-    print("BASELINE: young_share ~ exposure x post + occ FE + year FE")
-    print("=" * 66)
-    print(res.params[["exp_x_post"]].round(4).to_string())
-    print(res.std_errors[["exp_x_post"]].round(4).to_string())
-    print(f"tstat(exp_x_post) = {res.tstats['exp_x_post']:.2f}   "
-          f"pval = {res.pvalues['exp_x_post']:.4f}   n = {res.nobs}")
+    baseline_rows = []
+    outcomes = {
+        "young_share": "Age 20-29 share within occupation",
+        "young_per_100k": "Young workers in occupation per 100,000 young workers",
+    }
+    for outcome, label in outcomes.items():
+        indexed = df.set_index(["occ_code", "year"])
+        model = PanelOLS.from_formula(
+            f"{outcome} ~ exp_x_post + EntityEffects + TimeEffects", data=indexed
+        )
+        res = model.fit(cov_type="clustered", cluster_entity=True)
+        print("=" * 72)
+        print(f"BASELINE: {label}")
+        print("=" * 72)
+        print(f"coef = {res.params['exp_x_post']:.4f}   "
+              f"SE = {res.std_errors['exp_x_post']:.4f}   "
+              f"p = {res.pvalues['exp_x_post']:.4f}   n = {res.nobs}")
+        baseline_rows.append({
+            "outcome": outcome,
+            "term": "exposure_x_post",
+            "coefficient": res.params["exp_x_post"],
+            "std_error": res.std_errors["exp_x_post"],
+            "t_stat": res.tstats["exp_x_post"],
+            "p_value": res.pvalues["exp_x_post"],
+            "nobs": res.nobs,
+            "post_from": post_from,
+        })
+
     suffix = "_SYNTHETIC" if synthetic else ""
-    pd.DataFrame({
-        "term": ["exposure_x_post"],
-        "coefficient": [res.params["exp_x_post"]],
-        "std_error": [res.std_errors["exp_x_post"]],
-        "t_stat": [res.tstats["exp_x_post"]],
-        "p_value": [res.pvalues["exp_x_post"]],
-        "nobs": [res.nobs],
-        "post_from": [post_from],
-    }).to_csv(PROCESSED / f"regression_baseline{suffix}.csv", index=False)
+    pd.DataFrame(baseline_rows).to_csv(
+        PROCESSED / f"regression_baseline{suffix}.csv", index=False
+    )
 
     # --- event study ---
-    d = df.reset_index()
-    for yr in sorted(d["year"].unique()):
-        if yr == base_year:
-            continue
-        d[f"exp_x_{yr}"] = d["ai_exposure"] * (d["year"] == yr).astype(int)
-    d = d.set_index(["occ_code", "year"])
-    terms = [c for c in d.columns if c.startswith("exp_x_") and c != "exp_x_post"]
-    es = PanelOLS.from_formula(
-        "young_share ~ " + " + ".join(terms) + " + EntityEffects + TimeEffects",
-        data=d).fit(cov_type="clustered", cluster_entity=True)
-    print("\n" + "=" * 66)
-    print(f"EVENT STUDY (base year {base_year} omitted): exposure x year_k")
-    print("=" * 66)
-    out = pd.DataFrame({"coef": es.params[terms], "se": es.std_errors[terms]})
-    out.index = [t.replace("exp_x_", "") for t in out.index]
-    print(out.round(4).to_string())
-    out.rename_axis("year").reset_index().to_csv(
-        PROCESSED / f"event_study{suffix}.csv", index=False)
+    event_rows = []
+    for outcome, label in outcomes.items():
+        d = df.copy()
+        terms = []
+        for yr in sorted(d["year"].unique()):
+            if yr == base_year:
+                continue
+            term = f"exp_x_{yr}"
+            d[term] = d["ai_exposure"] * (d["year"] == yr).astype(int)
+            terms.append(term)
+        d = d.set_index(["occ_code", "year"])
+        es = PanelOLS.from_formula(
+            f"{outcome} ~ " + " + ".join(terms)
+            + " + EntityEffects + TimeEffects", data=d
+        ).fit(cov_type="clustered", cluster_entity=True)
+        print("\n" + "=" * 72)
+        print(f"EVENT STUDY: {label} (base year {base_year})")
+        print("=" * 72)
+        for term in terms:
+            event_rows.append({
+                "outcome": outcome,
+                "year": int(term.replace("exp_x_", "")),
+                "coefficient": es.params[term],
+                "std_error": es.std_errors[term],
+                "ci_low": es.params[term] - 1.96 * es.std_errors[term],
+                "ci_high": es.params[term] + 1.96 * es.std_errors[term],
+                "base_year": base_year,
+            })
+        print(pd.DataFrame(event_rows).query("outcome == @outcome")
+              [["year", "coefficient", "std_error"]].round(4).to_string(index=False))
+
+    event = pd.DataFrame(event_rows)
+    event.to_csv(PROCESSED / f"event_study{suffix}.csv", index=False)
+
+    # The continuous event study is the main design diagnostic.
+    plot = event[event["outcome"] == "young_share"].copy()
+    base = pd.DataFrame({
+        "year": [base_year], "coefficient": [0.0],
+        "ci_low": [0.0], "ci_high": [0.0],
+    })
+    plot = pd.concat([plot, base], ignore_index=True).sort_values("year")
+    fig, ax = plt.subplots(figsize=(9.5, 5.8), dpi=150)
+    coef = plot["coefficient"] * 100
+    low = plot["ci_low"] * 100
+    high = plot["ci_high"] * 100
+    ax.errorbar(plot["year"], coef, yerr=[coef - low, high - coef],
+                fmt="o-", color="#c53b2f", linewidth=2, capsize=4)
+    ax.axhline(0, color="#8f919e", linewidth=1)
+    ax.axvline(base_year + 0.5, color="#c7c9d1", linestyle="--", linewidth=1)
+    ax.set_xticks(years)
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Exposure × year coefficient (percentage points)")
+    ax.grid(axis="y", color="#e6e6eb", linewidth=0.8)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    if synthetic:
+        ax.text(0.5, 0.5, "SYNTHETIC DATA\nNOT A FINDING",
+                transform=ax.transAxes, fontsize=28, color="red", alpha=0.28,
+                ha="center", va="center", rotation=18, fontweight="bold")
+    fig.suptitle("The event study does not show a clean post-2023 break",
+                 x=0.11, y=0.98, ha="left", fontsize=17,
+                 fontweight="bold", color="#1b1d2b")
+    fig.text(0.11, 0.92,
+             f"Occupation and year fixed effects; 95% CI; {base_year} omitted",
+             ha="left", color="#6f7280", fontsize=10)
+    fig.subplots_adjust(left=0.11, right=0.98, bottom=0.13, top=0.82)
+    fig.savefig(FIGURES / f"event_study{suffix}.png", bbox_inches="tight")
+    plt.close(fig)
     print("\nA flat/near-zero pre-period (years before AI ramp) supports the "
           "design; a sloped pre-period warns of confounding trends.")
 

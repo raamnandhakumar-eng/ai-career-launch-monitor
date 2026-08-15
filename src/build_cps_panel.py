@@ -297,10 +297,12 @@ def transform(
         work = work.dropna(subset=["month"])
         work["month"] = work["month"].astype(int)
         monthly = (work.groupby(["year", "month", "occ_code", "age_band"],
-                                observed=True, as_index=False)["weight"].sum())
+                                observed=True, as_index=False)
+                   .agg(weight=("weight", "sum"), sample_n=("weight", "size")))
         months_per_year = work.groupby("year")["month"].nunique()
         panel = (monthly.groupby(["year", "occ_code", "age_band"],
-                                 observed=True, as_index=False)["weight"].sum())
+                                 observed=True, as_index=False)
+                  .agg(weight=("weight", "sum"), sample_n=("sample_n", "sum")))
         panel["weight"] = panel["weight"] / panel["year"].map(months_per_year)
         coverage = {
             str(int(year)): sorted(group["month"].unique().astype(int).tolist())
@@ -308,7 +310,8 @@ def transform(
         }
     elif frequency == "annual":
         panel = (work.groupby(["year", "occ_code", "age_band"],
-                              observed=True, as_index=False)["weight"].sum())
+                              observed=True, as_index=False)
+                 .agg(weight=("weight", "sum"), sample_n=("weight", "size")))
     else:
         raise ValueError("frequency must be 'monthly' or 'annual'")
 
@@ -330,6 +333,10 @@ def transform(
             int(year) for year, months in coverage.items() if len(months) < 12
         ],
         "age_universe": "employed people age 20 or older",
+        "sample_n_definition": (
+            "Unweighted CPS person-record count in each cell; monthly files sum "
+            "records across included months and can include repeat respondents."
+        ),
         "note": (
             "Monthly files are converted to annual-average employment by averaging "
             "monthly weighted stocks."

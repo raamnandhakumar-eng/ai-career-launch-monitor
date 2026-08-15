@@ -1,5 +1,5 @@
 """
-Entry-Level Squeeze Index (ELSI).
+Entry-Level Squeeze Index (ELSI), a descriptive screening index.
 
 An occupation-level composite flagging where AI exposure and a shrinking
 young-worker share coincide in jobs that historically depend on junior entrants.
@@ -47,6 +47,14 @@ def calculate(occ: pd.DataFrame) -> pd.DataFrame:
     d["elsi"] = d["f_exposure"] * d["f_decline"] * d["f_entry_dep"]
     d["elsi"] = _unit(d["elsi"])  # rescale product to [0,1] for readability
 
+    # New CPS builds include unweighted record counts. Older aggregate panels
+    # cannot recover these counts, so they are flagged instead of receiving a
+    # false precision label.
+    d["precision_flag"] = "sample unavailable"
+    if "young_sample_n_recent" in d:
+        d["precision_flag"] = "standard"
+        d.loc[d["young_sample_n_recent"] < 100, "precision_flag"] = "low precision"
+
     # Tiers by percentile rank among positive ELSI values. This stays stable
     # when ties would make quantile cut points non-unique.
     pos = d["elsi"] > 0
@@ -71,7 +79,9 @@ def compute(allow_synthetic: bool = False) -> pd.DataFrame:
     cols = ["occ_code", "title", "soc_major_label", "ai_exposure",
             "young_share_base", "young_share_change", "decline",
             "f_exposure", "f_decline", "f_entry_dep", "elsi", "risk_tier",
-            "employment_recent"]
+            "precision_flag", "employment_recent"]
+    if "young_sample_n_recent" in d:
+        cols.append("young_sample_n_recent")
     d[cols].to_csv(out, index=False)
     print(f"Wrote {out}")
     print("\nTop 20 Entry-Level Squeeze occupations:")

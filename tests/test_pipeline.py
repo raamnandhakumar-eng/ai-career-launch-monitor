@@ -88,6 +88,9 @@ class CpsBuilderTests(unittest.TestCase):
         by_band = panel.set_index("age_band")["employed"].to_dict()
         self.assertEqual(by_band["20-24"], 110)
         self.assertEqual(by_band["30-39"], 290)
+        sample_n = panel.set_index("age_band")["sample_n"].to_dict()
+        self.assertEqual(sample_n["20-24"], 2)
+        self.assertEqual(sample_n["30-39"], 2)
         self.assertEqual(metadata["month_coverage"], {"2024": [1, 2]})
 
     def test_contemporary_occ_maps_to_dashed_soc(self):
@@ -135,6 +138,17 @@ class PanelTests(unittest.TestCase):
         })
         out = young_worker_panel(cps)
         self.assertAlmostEqual(out.loc[0, "young_share"], 0.30)
+        self.assertAlmostEqual(out.loc[0, "young_per_100k"], 100000)
+
+    def test_entry_proxy_sums_to_100k_each_year(self):
+        cps = pd.DataFrame({
+            "year": [2024] * 4,
+            "occ_code": ["15-1251", "15-1251", "41-2031", "41-2031"],
+            "age_band": ["20-24", "30-39", "20-24", "30-39"],
+            "employed": [25, 75, 75, 25],
+        })
+        out = young_worker_panel(cps)
+        self.assertAlmostEqual(out["young_per_100k"].sum(), 100000)
 
     def test_synthetic_marker_uses_values_not_column_presence(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -160,6 +174,22 @@ class ElsiTests(unittest.TestCase):
         self.assertTrue(out["elsi"].between(0, 1).all())
         self.assertEqual(out.loc[out["occ_code"] == "c", "elsi"].iloc[0], 0)
         self.assertEqual(out.iloc[0]["occ_code"], "a")
+        self.assertTrue((out["precision_flag"] == "sample unavailable").all())
+
+    def test_low_precision_flag_uses_unweighted_young_sample(self):
+        occ = pd.DataFrame({
+            "occ_code": ["a", "b"],
+            "title": ["A", "B"],
+            "soc_major_label": ["X", "X"],
+            "ai_exposure": [0.8, 0.4],
+            "young_share_base": [0.4, 0.3],
+            "young_share_change": [-0.10, -0.05],
+            "young_sample_n_recent": [99, 100],
+            "employment_recent": [1000, 1000],
+        })
+        out = calculate(occ).set_index("occ_code")
+        self.assertEqual(out.loc["a", "precision_flag"], "low precision")
+        self.assertEqual(out.loc["b", "precision_flag"], "standard")
 
 
 if __name__ == "__main__":
