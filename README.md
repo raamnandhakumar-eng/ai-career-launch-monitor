@@ -35,7 +35,7 @@ The vendored Anthropic Economic Index file contains 756 detailed SOC occupations
   Specialists (**0.667**), and Market Research Analysts (**0.648**)
 - Highest-exposure major group: Computer & Mathematical (**0.38** mean)
 
-![Observed AI exposure across U.S. occupations](https://github.com/raamnandhakumar-eng/ai-career-launch-monitor/raw/main/figures/exposure_by_major_group.png)
+![Observed AI exposure across U.S. occupations](https://github.com/raamnandhakumar-eng/ai-career-launch-monitor/raw/90a7442ae5a860060a969540784b59b8f66b02d0/figures/exposure_by_major_group.png)
 
 These exposure facts do not show that employment has fallen.
 
