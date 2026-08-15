@@ -1,0 +1,17 @@
+{
+  "created": "2026-08-14",
+  "occupations": 756,
+  "theoretical_match_rate": 1.0,
+  "automation_match_rate_positive_observed": 0.8898550724637682,
+  "automation_definition": "Observed exposure multiplied by the penetration-weighted share of directive plus feedback-loop interactions among classified tasks.",
+  "augmentation_definition": "Observed exposure multiplied by the penetration-weighted share of task iteration, validation, and learning interactions among classified tasks.",
+  "theoretical_definition": "GPT-4 gamma rating (E1 + E2) from Eloundou et al.",
+  "sources": {
+    "anthropic_task_penetration": "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/labor_market_impacts/task_penetration.csv?download=true",
+    "anthropic_interaction_labels": "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/release_2025_03_27/automation_vs_augmentation_by_task.csv?download=true",
+    "anthropic_onet_tasks": "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/release_2025_03_27/onet_task_statements.csv?download=true",
+    "openai_theoretical_exposure": "https://raw.githubusercontent.com/openai/GPTs-are-GPTs/main/data/occ_level.csv",
+    "bls_soc_crosswalk": "https://www.bls.gov/soc/2018/soc_2010_to_2018_crosswalk.xlsx"
+  },
+  "limitation": "The automation split combines March 2025 interaction labels with the 2026 task-penetration release and is unavailable where no task can be classified. It is a descriptive mixed-vintage split."
+}

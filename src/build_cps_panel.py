@@ -95,7 +95,7 @@ def candidate_sample_ids(start: int, end: int, sample: str) -> list[str]:
         return [f"cps{year}_03s" for year in range(start, end + 1)]
     if sample == "basic":
         return [
-            f"cps{year}_{month:02d}b"
+            f"cps{year}_{month:02d}"
             for year in range(start, end + 1)
             for month in range(1, 13)
         ]
@@ -111,8 +111,23 @@ def available_sample_ids(
     """Filter requested IDs against the samples currently published by IPUMS."""
     published = set(available.keys() if isinstance(available, Mapping) else available)
     requested = candidate_sample_ids(start, end, sample)
-    selected = [sample_id for sample_id in requested if sample_id in published]
-    missing = [sample_id for sample_id in requested if sample_id not in published]
+    if sample == "basic":
+        selected = []
+        missing = []
+        for month_key in requested:
+            # IPUMS uses ``b`` for plain Basic Monthly samples and ``s`` for
+            # months carrying a supplement. Both contain the Basic variables.
+            # March has both BMS and ASEC, so always prefer the BMS ``b`` file.
+            candidates = [f"{month_key}b", f"{month_key}s"]
+            match = next((candidate for candidate in candidates
+                          if candidate in published), None)
+            if match:
+                selected.append(match)
+            else:
+                missing.append(month_key)
+    else:
+        selected = [sample_id for sample_id in requested if sample_id in published]
+        missing = [sample_id for sample_id in requested if sample_id not in published]
 
     if sample == "asec" and missing:
         raise ValueError(
@@ -164,7 +179,13 @@ def _fetch_ipums(start: int, end: int, sample: str) -> tuple[pd.DataFrame, dict]
     client = IpumsApiClient(api_key)
     published = client.get_all_sample_info(IPUMS_COLLECTION)
     selected = available_sample_ids(start, end, sample, published)
-    missing = [sample_id for sample_id in spec["samples"] if sample_id not in selected]
+    if sample == "basic":
+        missing = [
+            month_key for month_key in spec["samples"]
+            if not any(sample_id.startswith(month_key) for sample_id in selected)
+        ]
+    else:
+        missing = [sample_id for sample_id in spec["samples"] if sample_id not in selected]
     spec["samples"] = selected
     spec["unavailable_samples"] = missing
 

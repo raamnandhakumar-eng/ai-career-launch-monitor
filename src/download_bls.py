@@ -2,9 +2,9 @@
 Download BLS inputs.
 
 1. May 2025 OEWS national employment + wages by SOC occupation (public).
-2. Guidance for the CPS occupation x age panel, which drives the young-worker
-   analysis. CPS microdata are large and governed by IPUMS terms, so we do NOT
-   bundle them. Two supported routes are documented below and in data/README.md.
+2. Guidance for the Basic Monthly CPS worker-flow panel and the supporting ASEC
+   occupation-by-age panel. CPS microdata are governed by IPUMS terms, so they
+   are not bundled.
 
     python -m src.download_bls          # fetches OEWS national zip + extracts
 
@@ -37,7 +37,16 @@ def download_oews():
 
 
 CPS_INSTRUCTIONS = """
-CPS occupation x age panel -- build once, then it feeds build_panel.py.
+CPS worker flows -- main v2 outcome.
+
+    - Register at cps.ipums.org and set IPUMS_API_KEY.
+    - Run `python -m src.occupation_crosswalk` once.
+    - Submit, download, link, aggregate, and write the flow and wage panels:
+      python -m src.build_cps_flows --fetch-ipums --start 2020 --end 2025
+    - The builder links adjacent months with CPSIDV, applies PANLWT, and writes
+      entry, retention, exit, and age-20-29 outgoing-rotation wages.
+
+Supporting CPS occupation x age panel -- feeds build_panel.py.
 
 Route A (recommended, reproducible): automated IPUMS CPS API extract
     - Register at cps.ipums.org and set IPUMS_API_KEY.
@@ -64,7 +73,7 @@ Route B (no key): BLS CPS public tables
       tables (e.g. Table 11b) at bls.gov/cps/tables.htm, but only for broad age
       groups and a coarse occupation list. Lower resolution; fine for a first pass.
 
-Either way the required output schema is:
+The supporting panel schema is:
     year, occ_code, age_band, employed
 """
 

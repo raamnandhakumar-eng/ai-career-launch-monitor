@@ -18,8 +18,9 @@ FIGURES = ROOT / "figures"
 RAW_ANTHROPIC = RAW / "anthropic"
 RAW_BLS = RAW / "bls"
 RAW_ONET = RAW / "onet"
+RAW_OPENAI = RAW / "openai"
 
-for _p in (RAW_ANTHROPIC, RAW_BLS, RAW_ONET, PROCESSED, FIGURES):
+for _p in (RAW_ANTHROPIC, RAW_BLS, RAW_ONET, RAW_OPENAI, PROCESSED, FIGURES):
     _p.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -32,6 +33,23 @@ AEI_FILES = {
     "job_exposure.csv": f"{AEI_BASE}/labor_market_impacts/job_exposure.csv?download=true",
     "task_penetration.csv": f"{AEI_BASE}/labor_market_impacts/task_penetration.csv?download=true",
 }
+
+# Inputs used to split observed exposure into automation and augmentation and
+# to add the Eloundou et al. theoretical capability measure.
+AEI_AUTOMATION_TASKS = (
+    f"{AEI_BASE}/release_2025_03_27/"
+    "automation_vs_augmentation_by_task.csv?download=true"
+)
+AEI_ONET_TASKS = (
+    f"{AEI_BASE}/release_2025_03_27/onet_task_statements.csv?download=true"
+)
+OPENAI_THEORETICAL_EXPOSURE = (
+    "https://raw.githubusercontent.com/openai/GPTs-are-GPTs/"
+    "main/data/occ_level.csv"
+)
+BLS_SOC_2010_2018_CROSSWALK = (
+    "https://www.bls.gov/soc/2018/soc_2010_to_2018_crosswalk.xlsx"
+)
 
 # BLS OEWS (Occupational Employment and Wage Statistics) -- national, by SOC.
 # Provides employment levels and wages by occupation. Used as denominators and
@@ -47,6 +65,9 @@ ONET_EDU = f"https://www.onetcenter.org/dl_files/database/db_{ONET_DB_VERSION}_t
 # the CPS. These are NOT bundled here (large microdata / IPUMS terms). See
 # src/download_bls.py and data/README.md for how to build data/raw/bls/cps_panel.csv.
 CPS_PANEL_EXPECTED = RAW_BLS / "cps_panel.csv"
+CPS_FLOW_MONTHLY = RAW_BLS / "cps_flows_monthly.csv"
+CPS_FLOW_ANNUAL = RAW_BLS / "cps_flows_annual.csv"
+CPS_WAGE_PANEL = RAW_BLS / "cps_young_wages.csv"
 
 # ---------------------------------------------------------------------------
 # SOC 2018 major-group labels (public taxonomy, keyed by the 2-digit prefix)

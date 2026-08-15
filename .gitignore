@@ -5,6 +5,10 @@ data/raw/bls/oews/
 data/raw/bls/cps_panel.csv
 data/raw/bls/cps_panel.metadata.json
 data/raw/bls/cps_extract*
+data/raw/bls/cps_flows_monthly.csv
+data/raw/bls/cps_flows_monthly.metadata.json
+data/raw/bls/cps_flows_annual.csv
+data/raw/bls/cps_young_wages.csv
 data/raw/bls/census_crosswalk.xlsx
 data/raw/bls/census_occ_soc_crosswalk.csv
 data/raw/anthropic/task_penetration.csv

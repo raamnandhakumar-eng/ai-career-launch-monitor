@@ -12,6 +12,8 @@ from src.build_cps_panel import (
     normalize_soc,
     transform,
 )
+from src.build_cps_flows import flow_extract_spec, transform_flows, weighted_median
+from src.build_exposure_components import build_components
 from src.build_panel import young_worker_panel
 from src.data_guard import is_synthetic_panel
 from src.elsi import calculate
@@ -46,13 +48,24 @@ class CpsBuilderTests(unittest.TestCase):
 
     def test_basic_sample_selection_skips_unpublished_months(self):
         published = {
-            sample_id: {}
-            for sample_id in candidate_sample_ids(2025, 2025, "basic")
-            if sample_id != "cps2025_10b"
+            f"cps2025_{month:02d}{'b' if month in {1, 3, 4, 7} else 's'}": {}
+            for month in range(1, 13)
+            if month != 10
         }
         selected = available_sample_ids(2025, 2025, "basic", published)
         self.assertEqual(len(selected), 11)
-        self.assertNotIn("cps2025_10b", selected)
+        self.assertIn("cps2025_02s", selected)
+        self.assertFalse(any(sample.startswith("cps2025_10") for sample in selected))
+
+    def test_basic_sample_selection_prefers_bms_when_both_exist(self):
+        published = {
+            f"cps2025_{month:02d}s": {}
+            for month in range(1, 13)
+        }
+        published["cps2025_03b"] = {}
+        selected = available_sample_ids(2025, 2025, "basic", published)
+        self.assertIn("cps2025_03b", selected)
+        self.assertNotIn("cps2025_03s", selected)
 
     def test_automated_crosswalk_route_rejects_pre_2020(self):
         with self.assertRaisesRegex(ValueError, "2020 or later"):
@@ -126,6 +139,88 @@ class CpsBuilderTests(unittest.TestCase):
                 {"occ_census": "0020", "occ_code": "11-1021"},
             ],
         )
+
+
+class FlowBuilderTests(unittest.TestCase):
+    def test_flow_extract_spec_uses_link_and_wage_variables(self):
+        spec = flow_extract_spec(2024, 2025)
+        self.assertEqual(spec["person_identifier"], "CPSIDV")
+        self.assertEqual(spec["flow_weight"], "PANLWT")
+        self.assertEqual(spec["earnings_weight"], "EARNWT")
+        self.assertIn("EARNWEEK2", spec["variables"])
+
+    def test_entry_retention_and_exit_are_linked_transitions(self):
+        rows = []
+        states = {
+            "stay": [(10, 100), (10, 100)],
+            "switch": [(10, 100), (10, 200)],
+            "enter": [(20, 0), (10, 100)],
+            "exit": [(10, 200), (20, 0)],
+        }
+        for person, person_states in states.items():
+            for month, (empstat, occ) in enumerate(person_states, start=1):
+                rows.append({
+                    "YEAR": 2024, "MONTH": month, "CPSIDV": person,
+                    "MISH": month, "AGE": 24, "OCC": occ,
+                    "EMPSTAT": empstat, "PANLWT": 1,
+                    "EARNWEEK": 500, "EARNWEEK2": 500, "EARNWT": 1,
+                })
+        with tempfile.TemporaryDirectory() as temp_dir:
+            crosswalk = Path(temp_dir) / "crosswalk.csv"
+            pd.DataFrame({
+                "occ_census": ["0100", "0200"],
+                "occ_code": ["11-1011", "15-1251"],
+            }).to_csv(crosswalk, index=False)
+            monthly, annual, _, metadata = transform_flows(
+                pd.DataFrame(rows), crosswalk_path=crosswalk, min_match_rate=1,
+            )
+        by_occ = annual.set_index("occ_code")
+        self.assertEqual(by_occ.loc["11-1011", "entries_n"], 1)
+        self.assertEqual(by_occ.loc["11-1011", "retained_n"], 1)
+        self.assertEqual(by_occ.loc["11-1011", "exits_n"], 1)
+        self.assertAlmostEqual(by_occ.loc["11-1011", "entry_rate"], 0.5)
+        self.assertAlmostEqual(by_occ.loc["11-1011", "exit_rate"], 0.5)
+        self.assertEqual(metadata["linked_person_months"], 4)
+        self.assertFalse(monthly["synthetic"].any())
+
+    def test_weighted_median(self):
+        self.assertEqual(
+            weighted_median(pd.Series([10, 20, 30]), pd.Series([1, 1, 8])),
+            30,
+        )
+
+
+class ExposureComponentTests(unittest.TestCase):
+    def test_observed_exposure_splits_into_automation_and_augmentation(self):
+        jobs = pd.DataFrame({
+            "occ_code": ["15-1251", "41-2031"],
+            "observed_exposure": [0.8, 0.0],
+        })
+        penetration = pd.DataFrame({"task": ["Write code"], "penetration": [0.6]})
+        interactions = pd.DataFrame({
+            "task_name": ["Write code"], "feedback_loop": [0.25],
+            "directive": [0.50], "task_iteration": [0.10],
+            "validation": [0.10], "learning": [0.05],
+        })
+        tasks = pd.DataFrame({
+            "O*NET-SOC Code": ["15-1131.00"], "Task": ["Write code"],
+        })
+        theoretical = pd.DataFrame({
+            "O*NET-SOC Code": ["15-1251.00", "41-2031.00"],
+            "dv_rating_gamma": [0.7, 0.2], "dv_rating_beta": [0.5, 0.1],
+        })
+        crosswalk = pd.DataFrame({
+            "soc2010": ["15-1131"], "occ_code": ["15-1251"],
+        })
+        out, metadata = build_components(
+            jobs, penetration, interactions, tasks, theoretical, crosswalk,
+        )
+        by_occ = out.set_index("occ_code")
+        self.assertAlmostEqual(by_occ.loc["15-1251", "automation_exposure"], 0.6)
+        self.assertAlmostEqual(by_occ.loc["15-1251", "augmentation_exposure"], 0.2)
+        self.assertEqual(by_occ.loc["41-2031", "automation_exposure"], 0)
+        self.assertEqual(by_occ.loc["41-2031", "theoretical_exposure"], 0.2)
+        self.assertEqual(metadata["theoretical_match_rate"], 1)
 
 
 class PanelTests(unittest.TestCase):

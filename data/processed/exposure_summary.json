@@ -3,5 +3,8 @@
   "mean_exposure": 0.07697671957671957,
   "median_exposure": 0.0,
   "share_zero_exposure": 0.5436507936507936,
-  "high_exposure_cutoff": 0.09567500000000001
+  "high_exposure_cutoff": 0.09567500000000001,
+  "automation_occupations": 718,
+  "augmentation_occupations": 718,
+  "theoretical_occupations": 756
 }

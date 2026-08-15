@@ -1,184 +1,167 @@
 # AI Career Launch Monitor
 
-**Are highly AI-exposed occupations becoming harder for young workers to enter
-before broad unemployment rises?**
+## Question
 
-> **Finding:** Young employment in the highest-exposure occupation group fell
-> after 2023 relative to its 2020 level, while zero-exposure occupations grew.
->
-> **Caution:** The continuous event study does not show a clean post-2023 break,
-> and the baseline estimate disappears with occupation-specific trends. This is
-> an early-warning association, not a causal estimate.
+**Are highly AI-exposed occupations seeing fewer young workers enter, rather
+than more workers exit?**
 
-![Young employment by AI exposure group](figures/young_employment_by_exposure.png)
+**Main finding.** Not in the first real worker-flow estimates. In linked Basic
+Monthly CPS data for 2020–2025, observed exposure has a positive but imprecise
+post-2024 entry coefficient: **+1.02 percentage points** (SE 1.14, p=0.372).
+The exit estimate is **−0.03 points** (SE 1.02, p=0.977).
 
-## What this project measures
+**Robustness.** Automation, augmentation, and theoretical exposure also do not
+predict weaker entry. The older young-worker-share relationship weakens when
+occupation-specific trends are added.
 
-The project links real Anthropic Economic Index exposure data to an IPUMS CPS
-occupation-by-age panel for 2020–2025. It tests two outcomes:
+**Interpretation.** The more direct flow measure does not support an early
+entry squeeze in this window. This is descriptive evidence, not a causal
+estimate or proof of no effect.
 
-1. **Young-worker share:** workers age 20–29 as a share of workers age 20+ in
-   each occupation.
-2. **Occupational entry proxy:** workers age 20–29 in an occupation per 100,000
-   employed workers age 20–29.
+![Young-worker entry and exit rates by AI exposure](figures/worker_flows_by_exposure.png)
 
-The second outcome uses the young labor force as the denominator. It is closer
-to occupational access than the original within-occupation share, but it still
-does not directly observe hiring, tenure, entry, retention, or exit.
+The chart shows weighted worker-month transition rates for the highest observed
+exposure quartile and occupations with zero observed exposure. The fixed-effects
+estimates below use continuous occupation exposure and all qualifying cells.
 
-## Main results
+## What v2 measures
 
-| Check | Estimate | What it says |
-|---|---:|---|
-| Young-share baseline, exposure × post-2024 | −5.76 pp (SE 2.48, p=0.020) | More-exposed occupations lost more young-worker share in the simple two-way FE model. |
-| Entry proxy, exposure × post-2024 | −99.8 per 100,000 (SE 40.1, p=0.013) | Young employment shifted away from more-exposed occupations. |
-| Add occupation-specific trends | +0.74 pp (SE 6.78, p=0.913) | The baseline association is not robust to occupation trends. |
-| Exclude Computer & Mathematical | −6.46 pp (SE 2.63, p=0.014) | The baseline result is not only the technology hiring cycle. |
-| Age 20–24 | −3.30 pp (SE 2.26, p=0.144) | Negative, but imprecise. |
-| Age 25–29 | −2.46 pp (SE 2.40, p=0.305) | Negative, but imprecise. |
+The repository now links the same CPS respondent across adjacent survey months
+with `CPSIDV` and applies the IPUMS longitudinal weight `PANLWT`.
 
-Coefficients use a full-unit change in observed exposure. Most occupations are
-far below one. The estimates should not be read as treatment effects.
+| Flow | Definition for workers age 20–29 |
+|---|---|
+| Entry | Not in the occupation last month → in it now |
+| Retention | In the occupation last month → still in it now |
+| Exit | In the occupation last month → no longer in it now |
 
-## Main design diagnostic
+Job-to-job moves count as an exit from the old occupation and an entry into the
+new one. The extract contains **608,893 linked person-months** across **71 Basic
+Monthly CPS samples**. October 2025 was unavailable, so exact month coverage is
+recorded in the local metadata.
 
-The event study interacts continuous exposure with each year and omits 2023.
-The pre-period coefficients are not flat. The 2024 and 2025 coefficients are
-negative but imprecise. This weakens a post-2023 causal interpretation.
+## Main estimates
 
-![Continuous exposure event study](figures/event_study.png)
+The model is an occupation and year fixed-effects specification with standard
+errors clustered by occupation. Coefficients are for a full-unit change in the
+listed exposure measure; most occupations are far below one.
 
-## Robustness checks
+| Exposure | Entry rate × post | Exit rate × post | Young weekly wage × post |
+|---|---:|---:|---:|
+| Observed | +1.02 pp (p=0.372) | −0.03 pp (p=0.977) | −3.11% (p=0.363) |
+| Automation | +2.87 pp (p=0.273) | −0.31 pp (p=0.905) | −5.02% (p=0.562) |
+| Augmentation | +1.72 pp (p=0.359) | −0.33 pp (p=0.838) | −6.16% (p=0.251) |
+| Theoretical | +0.31 pp (p=0.633) | +0.74 pp (p=0.219) | −1.14% (p=0.545) |
 
-`analysis/05_robustness.py` runs:
+None of these estimates is statistically precise. In particular, the data do
+not show automation-heavy exposure predicting weaker entry while augmentation
+does not.
 
-- age-group heterogeneity for ages 20–24, 25–29, 30–39, 40–54, and 55+;
-- fake post dates in 2021, 2022, and 2023 using only pre-2024 data;
-- leave-one-occupation-group-out tests for technology, business and finance,
-  legal, office and administrative support, and sales;
-- occupation-specific linear trends.
+## Exposure measures
 
-![Age-group heterogeneity](figures/age_heterogeneity.png)
+| Measure | Construction |
+|---|---|
+| Observed | Share of occupation tasks observed in Claude usage |
+| Automation | Observed exposure allocated to directive and feedback-loop interactions |
+| Augmentation | Observed exposure allocated to task iteration, validation, and learning |
+| Theoretical | GPT-4 task exposure from Eloundou et al. (`E1 + E2`) |
 
-The younger coefficients are negative and the 30–39 and 55+ coefficients are
-positive, but every age-group confidence interval crosses zero. The stronger
-conclusion is that the current data are suggestive, not decisive.
+The automation/augmentation split combines Anthropic's March 2025 task
+interaction labels with its 2026 task-penetration release. It covers 89.0% of
+occupations with positive observed exposure. It is a mixed-vintage descriptive
+split, not an occupation-level probability of automation.
 
-## Entry-Level Squeeze Index
+## Wages and joint outcomes
 
-ELSI is a **descriptive screening index**:
+Young-worker weekly earnings come from outgoing rotation groups (`MISH` 4 and
+8), using `EARNWEEK2` where available, legacy `EARNWEEK` otherwise, and
+`EARNWT`. The pipeline writes:
 
-```text
-ELSI = scaled AI exposure
-       × scaled decline in young-worker share
-       × scaled baseline young-worker share
-```
+- weighted median and mean weekly wages;
+- annual wage growth and within-year wage percentile;
+- young-employment growth; and
+- an employment × wage-growth interaction plus four descriptive patterns:
+  fewer/more juniors combined with lower/higher wages.
 
-Only declines count. Min-max scaling and risk tiers are descriptive choices,
-not estimated probabilities. New CPS builds also store unweighted person-record
-counts. ELSI flags recent young-worker cells below 100 records as `low precision`.
-Older panels without record counts are marked `sample unavailable`.
+Wages are current-dollar and detailed occupation cells can be noisy. The main
+wage models require at least 10 unweighted observations per cell.
 
-## Data
+## Reproduce v2
 
-| Layer | Source | Status |
-|---|---|---|
-| Observed AI exposure | Anthropic Economic Index | Vendored, real, 756 SOC occupations |
-| Occupation × age × year | IPUMS CPS ASEC | Real 2020–2025 aggregate panel, 93.3% occupation match |
-| Employment and wages | BLS OEWS | Download route, not yet used in the main result |
-| Entry requirements | O*NET | Download route, not yet used in the main result |
-
-Raw IPUMS microdata and the generated CPS panel stay outside Git. The repository
-contains scripts, aggregate figures, tests, and provenance. Synthetic inputs are
-blocked from publication filenames and receive a visible watermark.
-
-## Reproduce
-
-Requires Python 3.10 or newer.
+Requires Python 3.10 or newer and an IPUMS account.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Exposure analysis
+# Refresh the four exposure measures, then build the occupation spine
+python -m src.build_exposure_components
 python -m src.build_exposure
-python analysis/01_exposure_descriptives.py
 
-# Build the real CPS panel with your own IPUMS key
+# Build the Census OCC → 2018 SOC crosswalk and real worker-flow extract
 python -m src.occupation_crosswalk
 export IPUMS_API_KEY=your_key_from_account.ipums.org
-python -m src.build_cps_panel --fetch-ipums \
-  --sample asec --start 2020 --end 2025
+python -m src.build_cps_flows --fetch-ipums --start 2020 --end 2025
 
-# Full research pipeline
-make research
+# Main flow, exposure, and wage analysis
+python analysis/03_worker_flows.py --post-from 2024
 make test
 ```
 
-The ASEC route uses `ASECWT` and contemporary `OCC` codes. The converter maps
-2018 Census occupation codes to detailed SOC codes, records match coverage, and
-rejects match rates below 80%.
+The API download is temporary. IPUMS microdata and generated CPS flow panels
+stay outside Git; the repository commits the extraction code, aggregate result
+tables, figure, and provenance.
 
-## Empirical design
+## Supporting stock analysis
 
-```text
-outcome[o,t] = β(AI exposure[o] × Post[t])
-               + occupation FE + year FE + error[o,t]
+The earlier ASEC analysis remains as a diagnostic rather than the headline. It
+measures young-worker share and young workers per 100,000 employed young
+workers. Its baseline association is negative, but it disappears with
+occupation-specific trends. Those outcomes measure occupation composition, not
+actual worker entry.
+
+```bash
+python -m src.build_cps_panel --fetch-ipums \
+  --sample asec --start 2020 --end 2025
+make research
 ```
 
-Standard errors are clustered by occupation. The repository also estimates a
-continuous event study and a model with occupation-specific linear trends.
+## Caveats
 
-## What the current panel cannot prove
-
-- A falling share can reflect entry, growth, retention, exit, or survey noise.
-- ASEC is repeated cross-sectional data in this pipeline, not a worker-flow panel.
-- Observed Claude use is not total AI exposure.
-- Static exposure may proxy for earlier occupation trends.
+- The design has no clean AI-adoption date and is not causal.
+- Flows are adjacent-month transitions, not a direct employer hiring record.
+- A job-to-job switch contributes to both an occupation exit and an entry.
+- Detailed occupation cells are noisy; flow models require at least 30 linked
+  observations per occupation-year.
+- October 2025 CPS was not collected, leaving ten linked transition months in
+  2025.
+- `CPSIDV` validates links but cannot eliminate all survey attrition or coding
+  error.
 - The modal Census-to-SOC crosswalk loses detail.
-- Detailed occupation-by-age CPS cells can be noisy.
-
-The next major data upgrade is a Basic Monthly CPS rotation panel using person
-identifiers and month-in-sample. That would separate entry, retention, and exit
-instead of inferring them from age composition.
-
-## Policy relevance
-
-If AI first weakens hiring rather than causing layoffs, some existing policies
-miss the affected worker.
-
-| Policy | Helps a laid-off worker? | Helps a never-hired graduate? |
-|---|---:|---:|
-| Unemployment Insurance | Yes | Usually no |
-| Wage insurance | Sometimes | Limited |
-| Retraining | Yes | Maybe |
-| Apprenticeship subsidy | Limited | Yes |
-| Hiring subsidy | Limited | Yes |
-| Broad income support | Yes | Yes |
-
-This motivates studying career-entry support, apprenticeships, and employer
-incentives. The current estimates are not strong enough to select a policy.
+- Observed Claude use is a lower bound on total AI use.
+- The automation split combines sources from different Anthropic releases.
+- Weekly wages are current-dollar and affected by CPS top-code conventions.
 
 ## Repository map
 
 ```text
-analysis/01_exposure_descriptives.py  Exposure distribution
-analysis/02_young_workers.py          Occupation scatter
-analysis/03_headline.py               Exposure-group trend
-analysis/04_regressions.py            Two-way FE and event study
+src/build_cps_flows.py                Basic Monthly CPS links, flows, and wages
+src/build_exposure_components.py      Automation, augmentation, and theory
+analysis/03_worker_flows.py           Main flow and wage estimates + figure
+src/build_cps_panel.py                Supporting ASEC occupation-age panel
+analysis/04_regressions.py            Supporting stock-outcome event study
 analysis/05_robustness.py             Trends, placebos, leave-outs, age groups
-src/build_cps_panel.py                IPUMS extract and aggregation
-src/build_panel.py                    Analysis outcomes
-src/elsi.py                           Descriptive screening index
-tests/test_pipeline.py                Pipeline tests
+tests/test_pipeline.py                Deterministic pipeline tests
 ```
 
-## License and citation
+## Data and license
 
-- Anthropic Economic Index: CC-BY 4.0
-- BLS and CPS: U.S. government data; IPUMS terms apply
-- O*NET: O*NET terms
+- [Anthropic Economic Index](https://huggingface.co/datasets/Anthropic/EconomicIndex): CC-BY 4.0
+- [IPUMS CPS](https://cps.ipums.org/cps/): IPUMS terms apply
+- [BLS CPS](https://www.bls.gov/cps/): U.S. government data
+- [GPTs are GPTs](https://github.com/openai/GPTs-are-GPTs): theoretical exposure
 - Repository code: MIT
 
-See [`CITATION.cff`](CITATION.cff) and [`data/provenance.json`](data/provenance.json).
+See [`CITATION.cff`](CITATION.cff), [`data/README.md`](data/README.md), and
+[`data/provenance.json`](data/provenance.json).

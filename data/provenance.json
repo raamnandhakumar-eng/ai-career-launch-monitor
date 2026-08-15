@@ -6,6 +6,19 @@
     "sha256": "4f0a3adf5feeb2ec5f5d02ab18cc5e851a2a4b8470bde84c0c9335017be12d68",
     "rows": 756,
     "verified_on": "2026-08-14"
+  },
+  "data/raw/anthropic/exposure_components.csv": {
+    "dataset": "Derived automation, augmentation, and theoretical exposure",
+    "upstream_urls": [
+      "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/labor_market_impacts/task_penetration.csv",
+      "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/release_2025_03_27/automation_vs_augmentation_by_task.csv",
+      "https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/main/release_2025_03_27/onet_task_statements.csv",
+      "https://raw.githubusercontent.com/openai/GPTs-are-GPTs/main/data/occ_level.csv",
+      "https://www.bls.gov/soc/2018/soc_2010_to_2018_crosswalk.xlsx"
+    ],
+    "method": "src/build_exposure_components.py",
+    "sha256": "4d91df6254d9c20ac42363925230644d80f4d97454da1a427e6d94aa9157ff03",
+    "rows": 756,
+    "verified_on": "2026-08-14"
   }
 }
-

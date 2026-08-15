@@ -15,6 +15,8 @@ import pandas as pd
 
 from src.config import RAW_ANTHROPIC, PROCESSED, soc_major, soc_major_label
 
+COMPONENTS = RAW_ANTHROPIC / "exposure_components.csv"
+
 
 def build() -> pd.DataFrame:
     df = pd.read_csv(RAW_ANTHROPIC / "job_exposure.csv", dtype={"occ_code": str})
@@ -30,6 +32,30 @@ def build() -> pd.DataFrame:
         raise ValueError("observed_exposure must be between 0 and 1")
 
     df = df.rename(columns={"observed_exposure": "ai_exposure"})
+    if not COMPONENTS.exists():
+        raise FileNotFoundError(
+            f"{COMPONENTS} is missing. Run python -m "
+            "src.build_exposure_components first."
+        )
+    components = pd.read_csv(COMPONENTS, dtype={"occ_code": str})
+    component_columns = {
+        "occ_code", "automation_exposure", "augmentation_exposure",
+        "theoretical_exposure",
+    }
+    missing_components = component_columns - set(components.columns)
+    if missing_components:
+        raise ValueError(
+            f"exposure_components.csv missing columns: {sorted(missing_components)}"
+        )
+    df = df.merge(components, on="occ_code", how="left", validate="one_to_one")
+    if df["theoretical_exposure"].isna().any():
+        raise ValueError("Theoretical exposure must match every occupation")
+    for column in (
+        "automation_exposure", "augmentation_exposure", "theoretical_exposure"
+    ):
+        invalid = df[column].dropna().between(0, 1).eq(False)
+        if invalid.any():
+            raise ValueError(f"{column} must be between 0 and 1")
     df["soc_major"] = df["occ_code"].map(soc_major)
     df["soc_major_label"] = df["occ_code"].map(soc_major_label)
 
@@ -56,6 +82,9 @@ def build() -> pd.DataFrame:
         "median_exposure": float(df["ai_exposure"].median()),
         "share_zero_exposure": float((df["ai_exposure"] == 0).mean()),
         "high_exposure_cutoff": float(df["ai_exposure"].quantile(0.75)),
+        "automation_occupations": int(df["automation_exposure"].notna().sum()),
+        "augmentation_occupations": int(df["augmentation_exposure"].notna().sum()),
+        "theoretical_occupations": int(df["theoretical_exposure"].notna().sum()),
     }
     (PROCESSED / "exposure_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8")
