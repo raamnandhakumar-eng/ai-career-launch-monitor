@@ -64,9 +64,16 @@ Monthly flow schema:
 year, month, occ_code,
 entries, entries_n, current_stayers, current_stayers_n,
 retained, retained_n, exits, exits_n,
-entry_at_risk, exit_at_risk,
-entry_rate, retention_rate, exit_rate, synthetic
+entry_population, previous_members_current_age,
+entry_risk, entry_risk_n, current_employment, current_sample_n,
+exit_at_risk, entry_rate, entrant_share, retention_rate, exit_rate, synthetic
 ```
+
+`entry_rate` divides entries by all linked age-20–29 respondents who were not
+in the occupation last month. `entrant_share` divides entries by current
+occupation employment and preserves the older composition measure under the
+correct name. The builder creates a complete occupation × month grid so valid
+zero-entry cells remain in the panel.
 
 Wage schema:
 
@@ -106,6 +113,10 @@ O*NET Job Zones and Education/Training files, fetched by
 - `exposure.csv`: observed, automation, augmentation, and theoretical exposure
   plus SOC labels and exposure groups
 - `flow_wage_regressions.csv`: fixed-effects entry, exit, and wage estimates
+- `flow_robustness.csv`: trends, placebos, weighting, balanced-panel, sample
+  thresholds, and leave-group-out checks for the corrected entry rate
+- `flow_event_study.csv`: exposure-by-year entry coefficients relative to 2023
+  and a joint pre-trend test
 - `flow_headline_series.csv`: weighted annual rates behind the main figure
 - `flow_wage_joint.csv`: occupation changes in entry, exit, young employment,
   wages, and their descriptive joint pattern

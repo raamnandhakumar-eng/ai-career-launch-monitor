@@ -5,35 +5,41 @@
 **Are highly AI-exposed occupations seeing fewer young workers enter, rather
 than more workers exit?**
 
-**Main finding.** Not in the first real worker-flow estimates. In linked Basic
-Monthly CPS data for 2020–2025, observed exposure has a positive but imprecise
-post-2024 entry coefficient: **+1.02 percentage points** (SE 1.14, p=0.372).
+**Main finding.** The corrected entry estimate is negative but imprecise. In
+linked Basic Monthly CPS data for 2020–2025, observed exposure has a post-2024
+entry-rate coefficient of **−0.0076 percentage points** (SE 0.0075, p=0.314).
 The exit estimate is **−0.03 points** (SE 1.02, p=0.977).
 
-**Robustness.** Automation, augmentation, and theoretical exposure also do not
-predict weaker entry. The older young-worker-share relationship weakens when
-occupation-specific trends are added.
+**Robustness.** The entry estimate stays negative across weighting, balanced
+panels, sample cutoffs, and most leave-group-out checks. It is never precise.
+Placebo estimates in 2022 and 2023 are also negative, and occupation trends
+erase the result. Pre-existing trends remain a serious concern.
 
-**Interpretation.** The more direct flow measure does not support an early
-entry squeeze in this window. This is descriptive evidence, not a causal
-estimate or proof of no effect.
+**Interpretation.** The direction is consistent with weaker entry, but the data
+do not establish an AI-driven entry squeeze. This is descriptive evidence, not
+a causal estimate.
 
 ![Young-worker entry and exit rates by AI exposure](figures/worker_flows_by_exposure.png)
 
-The chart shows weighted worker-month transition rates for the highest observed
-exposure quartile and occupations with zero observed exposure. The fixed-effects
-estimates below use continuous occupation exposure and all qualifying cells.
+The chart indexes weighted worker-month transition probabilities to 2023 for
+the highest observed-exposure quartile and occupations with zero exposure. The
+fixed-effects estimates use continuous exposure and all qualifying cells.
 
 ## What v2 measures
 
 The repository now links the same CPS respondent across adjacent survey months
 with `CPSIDV` and applies the IPUMS longitudinal weight `PANLWT`.
 
-| Flow | Definition for workers age 20–29 |
-|---|---|
-| Entry | Not in the occupation last month → in it now |
-| Retention | In the occupation last month → still in it now |
-| Exit | In the occupation last month → no longer in it now |
+| Outcome | Numerator | Denominator |
+|---|---|---|
+| Entry rate | Entered the occupation this month | Linked young people not in that occupation last month |
+| Entrant share | Entered the occupation this month | Current young workers in that occupation |
+| Retention rate | Stayed in the occupation | Young workers in that occupation last month |
+| Exit rate | Left the occupation | Young workers in that occupation last month |
+
+The earlier pipeline called entrants divided by entrants plus stayers the
+`entry_rate`. That is now correctly named `entrant_share`. The corrected
+`entry_rate` uses the population actually at risk of entering the occupation.
 
 Job-to-job moves count as an exit from the old occupation and an entry into the
 new one. The extract contains **608,893 linked person-months** across **71 Basic
@@ -46,16 +52,42 @@ The model is an occupation and year fixed-effects specification with standard
 errors clustered by occupation. Coefficients are for a full-unit change in the
 listed exposure measure; most occupations are far below one.
 
-| Exposure | Entry rate × post | Exit rate × post | Young weekly wage × post |
-|---|---:|---:|---:|
-| Observed | +1.02 pp (p=0.372) | −0.03 pp (p=0.977) | −3.11% (p=0.363) |
-| Automation | +2.87 pp (p=0.273) | −0.31 pp (p=0.905) | −5.02% (p=0.562) |
-| Augmentation | +1.72 pp (p=0.359) | −0.33 pp (p=0.838) | −6.16% (p=0.251) |
-| Theoretical | +0.31 pp (p=0.633) | +0.74 pp (p=0.219) | −1.14% (p=0.545) |
+| Exposure | Entry rate × post | Entrant share × post | Exit rate × post | Weekly wage × post |
+|---|---:|---:|---:|---:|
+| Observed | −0.0076 pp (p=0.314) | +1.02 pp (p=0.372) | −0.03 pp (p=0.977) | −3.11% (p=0.363) |
+| Automation | −0.0097 pp (p=0.358) | +2.87 pp (p=0.273) | −0.31 pp (p=0.905) | −5.02% (p=0.562) |
+| Augmentation | −0.0132 pp (p=0.364) | +1.72 pp (p=0.359) | −0.33 pp (p=0.838) | −6.16% (p=0.251) |
+| Theoretical | −0.0016 pp (p=0.492) | +0.31 pp (p=0.633) | +0.74 pp (p=0.219) | −1.14% (p=0.545) |
 
 None of these estimates is statistically precise. In particular, the data do
 not show automation-heavy exposure predicting weaker entry while augmentation
 does not.
+
+## Flow robustness
+
+`flow_robustness.csv` checks the corrected observed-exposure entry estimate.
+
+| Check | Coefficient | SE | p-value |
+|---|---:|---:|---:|
+| Baseline | −0.0076 pp | 0.0075 | 0.314 |
+| Unweighted | −0.0081 pp | 0.0078 | 0.297 |
+| Exclude 2020 | −0.0068 pp | 0.0081 | 0.403 |
+| Balanced 2020–2025 panel | −0.0082 pp | 0.0083 | 0.322 |
+| Minimum 15 current workers | −0.0066 pp | 0.0062 | 0.288 |
+| Minimum 100 current workers | −0.0110 pp | 0.0130 | 0.397 |
+| Occupation-specific trends | +0.0058 pp | 0.7339 | 0.994 |
+| Fake post-2022 | −0.0098 pp | 0.0053 | 0.067 |
+| Fake post-2023 | −0.0105 pp | 0.0063 | 0.095 |
+
+Leave-one-group-out estimates are also reported for computer and mathematical,
+business and financial, legal, office and administrative support, and sales
+occupations. The negative placebos and weak trend-adjusted estimate prevent a
+clean post-2023 interpretation.
+
+The continuous flow event study uses 2023 as the base year. Its joint pre-trend
+test has p=0.182, so it does not reject flat pre-trends, but the 2021 coefficient
+is marginal (p=0.054). The 2024 coefficient is positive and the 2025 coefficient
+is negative; both are imprecise. There is no clean post-2023 break.
 
 ## Exposure measures
 
@@ -131,6 +163,8 @@ make research
 
 - The design has no clean AI-adoption date and is not causal.
 - Flows are adjacent-month transitions, not a direct employer hiring record.
+- Entry is an occupation-specific transition probability. Each linked person
+  belongs to the risk set for every occupation they were not in last month.
 - A job-to-job switch contributes to both an occupation exit and an entry.
 - Detailed occupation cells are noisy; flow models require at least 30 linked
   observations per occupation-year.
@@ -148,7 +182,7 @@ make research
 ```text
 src/build_cps_flows.py                Basic Monthly CPS links, flows, and wages
 src/build_exposure_components.py      Automation, augmentation, and theory
-analysis/03_worker_flows.py           Main flow and wage estimates + figure
+analysis/03_worker_flows.py           Main estimates, robustness, and figure
 src/build_cps_panel.py                Supporting ASEC occupation-age panel
 analysis/04_regressions.py            Supporting stock-outcome event study
 analysis/05_robustness.py             Trends, placebos, leave-outs, age groups

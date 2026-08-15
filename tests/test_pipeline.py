@@ -179,9 +179,45 @@ class FlowBuilderTests(unittest.TestCase):
         self.assertEqual(by_occ.loc["11-1011", "retained_n"], 1)
         self.assertEqual(by_occ.loc["11-1011", "exits_n"], 1)
         self.assertAlmostEqual(by_occ.loc["11-1011", "entry_rate"], 0.5)
+        self.assertAlmostEqual(by_occ.loc["11-1011", "entrant_share"], 0.5)
         self.assertAlmostEqual(by_occ.loc["11-1011", "exit_rate"], 0.5)
+        self.assertAlmostEqual(by_occ.loc["15-1251", "entry_rate"], 1 / 3)
+        self.assertAlmostEqual(by_occ.loc["15-1251", "entrant_share"], 1.0)
+        self.assertEqual(by_occ.loc["15-1251", "entry_risk_n"], 3)
         self.assertEqual(metadata["linked_person_months"], 4)
         self.assertFalse(monthly["synthetic"].any())
+
+    def test_zero_entry_cells_are_retained_in_complete_risk_grid(self):
+        rows = []
+        for month in (1, 2):
+            rows.extend([
+                {
+                    "YEAR": 2024, "MONTH": month, "CPSIDV": "a",
+                    "MISH": month, "AGE": 24, "OCC": 100,
+                    "EMPSTAT": 10, "PANLWT": 1, "EARNWEEK": 500,
+                    "EARNWEEK2": 500, "EARNWT": 1,
+                },
+                {
+                    "YEAR": 2024, "MONTH": month, "CPSIDV": "b",
+                    "MISH": month, "AGE": 24, "OCC": 100,
+                    "EMPSTAT": 10, "PANLWT": 1, "EARNWEEK": 500,
+                    "EARNWEEK2": 500, "EARNWT": 1,
+                },
+            ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            crosswalk = Path(temp_dir) / "crosswalk.csv"
+            pd.DataFrame({
+                "occ_census": ["0100", "0200"],
+                "occ_code": ["11-1011", "15-1251"],
+            }).to_csv(crosswalk, index=False)
+            _, annual, _, _ = transform_flows(
+                pd.DataFrame(rows), crosswalk_path=crosswalk, min_match_rate=1,
+            )
+        unused = annual.set_index("occ_code").loc["15-1251"]
+        self.assertEqual(unused["entries"], 0)
+        self.assertEqual(unused["entry_rate"], 0)
+        self.assertEqual(unused["entry_risk_n"], 2)
+        self.assertTrue(pd.isna(unused["entrant_share"]))
 
     def test_weighted_median(self):
         self.assertEqual(

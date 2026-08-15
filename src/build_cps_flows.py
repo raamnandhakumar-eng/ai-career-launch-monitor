@@ -8,8 +8,11 @@ with ``CPSIDV``. ``PANLWT`` weights the linked pair. For each occupation:
 * exit: employed in that occupation last month and not in it now.
 
 Entry is measured for workers age 20-29 in the current month. Retention and
-exit are measured for workers age 20-29 in the previous month. Weekly earnings
-come from outgoing rotation groups (MISH 4 and 8) and use ``EARNWT``.
+exit are measured for workers age 20-29 in the previous month. ``entry_rate``
+uses all linked young people who were not in the occupation last month as its
+risk set. ``entrant_share`` uses entrants plus stayers and therefore describes
+the composition of current occupation employment. Weekly earnings come from
+outgoing rotation groups (MISH 4 and 8) and use ``EARNWT``.
 
     python -m src.build_cps_flows --fetch-ipums --start 2020 --end 2025
 """
@@ -264,6 +267,14 @@ def transform_flows(
     young_now = linked["age"].between(YOUNG_MIN, YOUNG_MAX)
     young_previous = linked["previous_age"].between(YOUNG_MIN, YOUNG_MAX)
 
+    entry_population = (
+        linked.loc[young_now, ["year", "month", "pair_weight"]]
+        .groupby(["year", "month"], as_index=False)
+        .agg(
+            entry_population=("pair_weight", "sum"),
+            entry_population_n=("pair_weight", "size"),
+        )
+    )
     tables = [
         _event_table(
             linked,
@@ -289,19 +300,41 @@ def transform_flows(
             "previous_occ_code",
             "exits",
         ),
+        _event_table(
+            linked,
+            young_now & linked["previous_occ_code"].notna(),
+            "previous_occ_code",
+            "previous_members_current_age",
+        ),
     ]
     keys = ["year", "month", "occ_code"]
-    monthly = tables[0]
-    for table in tables[1:]:
+    months = linked[["year", "month"]].drop_duplicates()
+    occupations = pd.DataFrame({"occ_code": sorted(set(mapping.values()))})
+    monthly = months.merge(occupations, how="cross").merge(
+        entry_population, on=["year", "month"], how="left",
+    )
+    for table in tables:
         monthly = monthly.merge(table, on=keys, how="outer")
     count_columns = [
         "entries", "entries_n", "current_stayers", "current_stayers_n",
         "retained", "retained_n", "exits", "exits_n",
+        "previous_members_current_age", "previous_members_current_age_n",
     ]
-    monthly[count_columns] = monthly[count_columns].fillna(0)
-    monthly["entry_at_risk"] = monthly["entries"] + monthly["current_stayers"]
+    for column in count_columns:
+        monthly[column] = pd.to_numeric(monthly[column], errors="coerce").fillna(0)
+    monthly["entry_risk"] = (
+        monthly["entry_population"] - monthly["previous_members_current_age"]
+    ).clip(lower=0)
+    monthly["entry_risk_n"] = (
+        monthly["entry_population_n"] - monthly["previous_members_current_age_n"]
+    ).clip(lower=0)
+    monthly["current_employment"] = monthly["entries"] + monthly["current_stayers"]
+    monthly["current_sample_n"] = monthly["entries_n"] + monthly["current_stayers_n"]
     monthly["exit_at_risk"] = monthly["exits"] + monthly["retained"]
-    monthly["entry_rate"] = monthly["entries"] / monthly["entry_at_risk"].replace(0, np.nan)
+    monthly["entry_rate"] = monthly["entries"] / monthly["entry_risk"].replace(0, np.nan)
+    monthly["entrant_share"] = (
+        monthly["entries"] / monthly["current_employment"].replace(0, np.nan)
+    )
     monthly["retention_rate"] = monthly["retained"] / monthly["exit_at_risk"].replace(0, np.nan)
     monthly["exit_rate"] = monthly["exits"] / monthly["exit_at_risk"].replace(0, np.nan)
     monthly["synthetic"] = False
@@ -318,14 +351,27 @@ def transform_flows(
             retained_n=("retained_n", "sum"),
             exits=("exits", "sum"),
             exits_n=("exits_n", "sum"),
+            entry_population=("entry_population", "sum"),
+            entry_population_n=("entry_population_n", "sum"),
+            previous_members_current_age=("previous_members_current_age", "sum"),
+            previous_members_current_age_n=("previous_members_current_age_n", "sum"),
             months=("month", "nunique"),
         )
     )
-    annual["entry_at_risk"] = annual["entries"] + annual["current_stayers"]
+    annual["entry_risk"] = (
+        annual["entry_population"] - annual["previous_members_current_age"]
+    ).clip(lower=0)
+    annual["entry_risk_n"] = (
+        annual["entry_population_n"] - annual["previous_members_current_age_n"]
+    ).clip(lower=0)
+    annual["current_employment"] = annual["entries"] + annual["current_stayers"]
+    annual["current_sample_n"] = annual["entries_n"] + annual["current_stayers_n"]
     annual["exit_at_risk"] = annual["exits"] + annual["retained"]
-    annual["entry_sample_n"] = annual["entries_n"] + annual["current_stayers_n"]
     annual["exit_sample_n"] = annual["exits_n"] + annual["retained_n"]
-    annual["entry_rate"] = annual["entries"] / annual["entry_at_risk"].replace(0, np.nan)
+    annual["entry_rate"] = annual["entries"] / annual["entry_risk"].replace(0, np.nan)
+    annual["entrant_share"] = (
+        annual["entries"] / annual["current_employment"].replace(0, np.nan)
+    )
     annual["retention_rate"] = annual["retained"] / annual["exit_at_risk"].replace(0, np.nan)
     annual["exit_rate"] = annual["exits"] / annual["exit_at_risk"].replace(0, np.nan)
     annual["synthetic"] = False
@@ -353,10 +399,20 @@ def transform_flows(
         "exit_definition": (
             "Age 20-29 in the prior month; no longer employed in that occupation now."
         ),
-        "rate_denominators": (
-            "Entry uses current young entrants plus current young stayers. Exit and "
-            "retention use prior young exits plus prior young retained workers."
-        ),
+        "rate_denominators": {
+            "entry_rate": (
+                "All linked people age 20-29 now who were not in the occupation "
+                "in the prior month."
+            ),
+            "entrant_share": (
+                "Current linked workers age 20-29 in the occupation: entrants "
+                "plus stayers."
+            ),
+            "exit_rate_and_retention_rate": (
+                "Prior linked workers age 20-29 in the occupation: exits plus "
+                "retained workers."
+            ),
+        },
         "wage_definition": (
             "Current-dollar weekly earnings for employed age 20-29 outgoing-rotation "
             "respondents (MISH 4 or 8), using EARNWEEK2 where available and legacy "
