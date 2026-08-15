@@ -15,15 +15,21 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import FIGURES, PROCESSED  # noqa: E402
 from src.data_guard import guard_publication  # noqa: E402
+from src.plot_style import (  # noqa: E402
+    ACCENT, BLUE, MUTE, SOFT_RED, add_footer, add_header, apply_chart_style,
+    save_chart, style_axes,
+)
+
+apply_chart_style()
 
 YOUNG = {"20-24", "25-29"}
 GROUPS = ["Q0 (none)", "Q1 (low)", "Q2", "Q3", "Q4 (high)"]
 COLORS = {
-    "Q0 (none)": "#8f919e",
+    "Q0 (none)": MUTE,
     "Q1 (low)": "#9ab6d3",
     "Q2": "#668fb8",
-    "Q3": "#365f8d",
-    "Q4 (high)": "#c53b2f",
+    "Q3": BLUE,
+    "Q4 (high)": ACCENT,
 }
 
 
@@ -67,7 +73,7 @@ def main(base_year: int = 2020, allow_synthetic: bool = False) -> None:
     suffix = "_SYNTHETIC" if synthetic else ""
     series.to_csv(PROCESSED / f"headline_series{suffix}.csv", index=False)
 
-    fig, ax = plt.subplots(figsize=(12, 7), dpi=150)
+    fig, ax = plt.subplots(figsize=(11, 7), dpi=150)
     for group in GROUPS:
         d = series[series["exposure_q"] == group]
         if d.empty:
@@ -83,42 +89,38 @@ def main(base_year: int = 2020, allow_synthetic: bool = False) -> None:
     years = sorted(series["year"].unique())
     ax.axhline(100, color="#c7c9d1", linewidth=1, zorder=1)
     if max(years) >= 2024:
-        ax.axvspan(2023.5, max(years) + 0.35, color="#f7ecea", zorder=0)
-        ax.text(2023.62, ax.get_ylim()[1] - 1, "2024-25",
-                color="#9b4b43", fontsize=10, va="top")
+        ax.axvspan(2023.5, max(years) + 0.35, color=SOFT_RED, zorder=0)
+        ax.text(2023.62, ax.get_ylim()[1] - 0.8, "2024-25",
+                color="#9b4b43", fontsize=9.5, va="top")
     ax.set_xticks(years)
     ax.set_xlabel("Year")
-    ax.set_ylabel(f"Young employment index ({base_year}=100)")
-    ax.grid(axis="y", color="#e6e6eb", linewidth=0.8)
-    ax.legend(frameon=False, ncol=5, loc="upper center",
-              bbox_to_anchor=(0.5, 1.02), fontsize=9)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-
-    fig.suptitle(
-        "Higher-exposure occupation groups lagged after 2023",
-        x=0.08, y=0.98, ha="left", fontsize=20, fontweight="bold",
-        color="#1b1d2b",
+    ax.set_ylabel(f"Index ({base_year}=100)")
+    style_axes(ax, grid_axis="y")
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(
+        handles, labels, frameon=False, ncol=5, loc="upper left",
+        bbox_to_anchor=(0.075, 0.865), fontsize=9.2, handlelength=2.6,
+        columnspacing=1.5,
     )
-    fig.text(
-        0.08, 0.935,
-        "CPS ASEC weighted employment, age 20-29, balanced SOC occupations",
-        ha="left", fontsize=11, color="#6f7280",
+    add_header(
+        fig,
+        "Higher-exposure groups lagged after 2023",
+        f"Young employment index ({base_year}=100); CPS ASEC, age 20-29, balanced SOC occupations",
+        left=0.08,
     )
-    fig.text(
-        0.08, 0.02,
+    add_footer(
+        fig,
         "Descriptive only. Exposure groups use Anthropic observed use; Q0 has no observed use.",
-        ha="left", fontsize=9, color="#6f7280",
+        left=0.08,
     )
     if synthetic:
         ax.text(0.5, 0.5, "SYNTHETIC DATA\nNOT A FINDING",
                 transform=ax.transAxes, fontsize=32, color="red", alpha=0.28,
                 ha="center", va="center", rotation=18, fontweight="bold")
 
-    fig.subplots_adjust(left=0.1, right=0.98, bottom=0.12, top=0.84)
+    fig.subplots_adjust(left=0.1, right=0.98, bottom=0.13, top=0.73)
     out = FIGURES / f"young_employment_by_exposure{suffix}.png"
-    fig.savefig(out, bbox_inches="tight")
-    plt.close(fig)
+    save_chart(fig, out)
     print(f"Saved {out}")
 
 

@@ -31,6 +31,12 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import FIGURES, PROCESSED  # noqa: E402
 from src.data_guard import guard_publication  # noqa: E402
+from src.plot_style import (  # noqa: E402
+    ACCENT, MUTE, SOFT_RED, add_footer, add_header, apply_chart_style,
+    save_chart, style_axes,
+)
+
+apply_chart_style()
 
 YOUNG = {"20-24", "25-29"}
 
@@ -147,33 +153,40 @@ def run(post_from: int, base_year: int | None = None,
         "ci_low": [0.0], "ci_high": [0.0],
     })
     plot = pd.concat([plot, base], ignore_index=True).sort_values("year")
-    fig, ax = plt.subplots(figsize=(9.5, 5.8), dpi=150)
+    fig, ax = plt.subplots(figsize=(10.5, 6.4), dpi=150)
     coef = plot["coefficient"] * 100
     low = plot["ci_low"] * 100
     high = plot["ci_high"] * 100
     ax.errorbar(plot["year"], coef, yerr=[coef - low, high - coef],
-                fmt="o-", color="#c53b2f", linewidth=2, capsize=4)
-    ax.axhline(0, color="#8f919e", linewidth=1)
-    ax.axvline(base_year + 0.5, color="#c7c9d1", linestyle="--", linewidth=1)
+                fmt="o-", color=ACCENT, linewidth=2.2, capsize=4,
+                markersize=6)
+    ax.axhline(0, color=MUTE, linewidth=1)
+    if max(years) >= 2024:
+        ax.axvspan(2023.5, max(years) + 0.35, color=SOFT_RED, zorder=0)
+    ax.text(base_year, 0.97, f"{base_year} reference",
+            transform=ax.get_xaxis_transform(), ha="center", va="top",
+            color=MUTE, fontsize=9)
     ax.set_xticks(years)
     ax.set_xlabel("Year")
-    ax.set_ylabel("Exposure × year coefficient (percentage points)")
-    ax.grid(axis="y", color="#e6e6eb", linewidth=0.8)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
+    ax.set_ylabel("Coefficient (percentage points)")
+    style_axes(ax, grid_axis="y")
     if synthetic:
         ax.text(0.5, 0.5, "SYNTHETIC DATA\nNOT A FINDING",
                 transform=ax.transAxes, fontsize=28, color="red", alpha=0.28,
                 ha="center", va="center", rotation=18, fontweight="bold")
-    fig.suptitle("The event study does not show a clean post-2023 break",
-                 x=0.11, y=0.98, ha="left", fontsize=17,
-                 fontweight="bold", color="#1b1d2b")
-    fig.text(0.11, 0.92,
-             f"Occupation and year fixed effects; 95% CI; {base_year} omitted",
-             ha="left", color="#6f7280", fontsize=10)
-    fig.subplots_adjust(left=0.11, right=0.98, bottom=0.13, top=0.82)
-    fig.savefig(FIGURES / f"event_study{suffix}.png", bbox_inches="tight")
-    plt.close(fig)
+    add_header(
+        fig,
+        "No clean post-2023 break",
+        "Continuous exposure event study; occupation and year fixed effects",
+        left=0.1,
+    )
+    add_footer(
+        fig,
+        "95% confidence intervals; standard errors clustered by occupation.",
+        left=0.1,
+    )
+    fig.subplots_adjust(left=0.11, right=0.98, bottom=0.15, top=0.79)
+    save_chart(fig, FIGURES / f"event_study{suffix}.png")
     print("\nA flat/near-zero pre-period (years before AI ramp) supports the "
           "design; a sloped pre-period warns of confounding trends.")
 

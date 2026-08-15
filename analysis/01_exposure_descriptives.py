@@ -15,15 +15,11 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import PROCESSED, FIGURES  # noqa: E402
+from src.plot_style import (  # noqa: E402
+    ACCENT, INK, MUTE, add_header, apply_chart_style, save_chart, style_axes,
+)
 
-INK = "#1a1a2e"
-ACCENT = "#c0392b"
-MUTE = "#8a8a99"
-plt.rcParams.update({
-    "font.family": "DejaVu Sans", "font.size": 10,
-    "axes.edgecolor": INK, "axes.linewidth": 0.8,
-    "figure.dpi": 130, "savefig.dpi": 150,
-})
+apply_chart_style()
 
 
 def main():
@@ -33,33 +29,22 @@ def main():
              .mean().sort_values())
     share_zero = (df["ai_exposure"] == 0).mean()
 
-    # A vertical layout keeps every occupation label readable when the image is
-    # displayed at GitHub README width.
-    fig = plt.figure(figsize=(12, 14.2), layout="constrained")
-    fig.set_constrained_layout_pads(h_pad=0.16, hspace=0.08)
-    grid = fig.add_gridspec(3, 1, height_ratios=[0.28, 2.05, 1.55])
-    header = fig.add_subplot(grid[0])
-    axL = fig.add_subplot(grid[1])
-    axR = fig.add_subplot(grid[2])
-
-    header.axis("off")
-    fig.text(
-        0.035, 0.982,
-        "Where observed AI use is concentrated across U.S. occupations",
-        fontsize=19, fontweight="bold", color=INK, ha="left", va="top",
+    fig, (axL, axR) = plt.subplots(
+        1, 2, figsize=(18, 10.5), gridspec_kw={"width_ratios": [1, 1.05]}
     )
-    fig.text(
-        0.035, 0.953,
-        f"Anthropic Economic Index  |  {len(df)} SOC occupations  |  "
-        f"{share_zero:.0%} show zero observed usage",
-        fontsize=11, color=MUTE, ha="left", va="top",
+    add_header(
+        fig,
+        "Where observed AI use is concentrated",
+        f"Anthropic Economic Index  |  {len(df)} detailed SOC occupations  |  "
+        f"{share_zero:.0%} have no observed use",
+        left=0.04, title_y=0.97, subtitle_y=0.915, title_size=23,
     )
 
     # --- Left: mean exposure by SOC major group ---
     colors = [ACCENT if v >= 0.15 else MUTE for v in grp.values]
     axL.barh(grp.index, grp.values, color=colors, height=0.72)
     axL.set_title("Mean exposure by occupation group",
-                  fontsize=14, fontweight="bold", color=INK, loc="left", pad=18)
+                  fontsize=15, fontweight="bold", color=INK, loc="left", pad=20)
     axL.text(
         0, 1.005,
         "Unweighted mean across detailed occupations in each SOC group",
@@ -70,21 +55,18 @@ def main():
     axL.set_xlim(0, 0.42)
     axL.tick_params(axis="y", length=0, labelsize=10.5)
     axL.tick_params(axis="x", length=0, labelsize=9.5)
-    axL.xaxis.grid(True, color="#e8e8ee", linewidth=0.8)
-    axL.set_axisbelow(True)
-    for s in ("top", "right", "left"):
-        axL.spines[s].set_visible(False)
+    style_axes(axL, grid_axis="x", hide_left=True)
     for y, v in enumerate(grp.values):
         axL.text(max(v + 0.004, 0.006), y, f"{v:.2f}", va="center",
                  fontsize=9, color=INK)
 
     # --- Bottom: most-exposed detailed occupations ---
     top = df.nlargest(12, "ai_exposure")[::-1]
-    labels = top["title"].map(lambda s: textwrap.fill(s, width=62))
+    labels = top["title"].map(lambda s: textwrap.fill(s, width=43))
     axR.barh(labels, top["ai_exposure"],
              color=ACCENT, height=0.72)
     axR.set_title("Most-exposed detailed occupations",
-                  fontsize=14, fontweight="bold", color=INK, loc="left", pad=18)
+                  fontsize=15, fontweight="bold", color=INK, loc="left", pad=20)
     axR.text(
         0, 1.005,
         "Detailed 2018 SOC occupations ranked by observed exposure",
@@ -94,18 +76,15 @@ def main():
     axR.set_xlim(0, 0.80)
     axR.tick_params(axis="y", length=0, labelsize=10)
     axR.tick_params(axis="x", length=0, labelsize=9.5)
-    axR.xaxis.grid(True, color="#e8e8ee", linewidth=0.8)
-    axR.set_axisbelow(True)
+    style_axes(axR, grid_axis="x", hide_left=True)
     for label in axR.get_yticklabels():
         label.set_linespacing(0.95)
-    for s in ("top", "right", "left"):
-        axR.spines[s].set_visible(False)
     for y, v in enumerate(top["ai_exposure"].values):
         axR.text(v + 0.009, y, f"{v:.2f}", va="center", fontsize=9, color=INK)
 
     out = FIGURES / "exposure_by_major_group.png"
-    fig.savefig(out, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    fig.subplots_adjust(left=0.27, right=0.985, bottom=0.09, top=0.80, wspace=0.62)
+    save_chart(fig, out)
     print(f"Saved {out}")
 
     print("\nMost exposed:")

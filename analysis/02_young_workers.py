@@ -21,8 +21,12 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import PROCESSED, FIGURES  # noqa: E402
 from src.data_guard import guard_publication  # noqa: E402
+from src.plot_style import (  # noqa: E402
+    ACCENT, INK, MUTE, add_footer, add_header, apply_chart_style, save_chart,
+    style_axes,
+)
 
-INK, ACCENT, MUTE = "#1a1a2e", "#c0392b", "#8a8a99"
+apply_chart_style()
 
 
 def main(allow_synthetic: bool = False):
@@ -38,7 +42,7 @@ def main(allow_synthetic: bool = False):
     fallback = d["employment_recent"].dropna().median()
     w = d["employment_recent"].fillna(fallback).clip(lower=1).values
 
-    fig, ax = plt.subplots(figsize=(9, 6.2), dpi=130)
+    fig, ax = plt.subplots(figsize=(11, 7), dpi=150)
     ax.axhline(0, color=MUTE, lw=0.8, zorder=1)
     ax.scatter(x, y, s=np.sqrt(w) / 6, alpha=0.45, color=ACCENT,
                edgecolor="white", linewidth=0.4, zorder=2)
@@ -46,16 +50,29 @@ def main(allow_synthetic: bool = False):
     # employment-weighted linear fit
     b, a = np.polyfit(x, y, 1, w=np.sqrt(w))
     xs = np.linspace(x.min(), x.max(), 50)
-    ax.plot(xs, a + b * xs, color=INK, lw=2, zorder=3,
-            label=f"weighted fit: slope={b:.1f} pp per unit exposure")
+    ax.plot(xs, a + b * xs, color=INK, lw=2.2, zorder=3)
 
     ax.set_xlabel("Observed AI exposure (Anthropic Economic Index)")
-    ax.set_ylabel("Change in age 20-29 employment share (pp)")
-    ax.set_title("Do more AI-exposed occupations shed young workers first?",
-                 fontsize=13, fontweight="bold", color=INK, loc="left")
-    ax.legend(frameon=False, fontsize=9)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
+    ax.set_ylabel("Change in age 20-29 employment share (percentage points)")
+    style_axes(ax, grid_axis="y")
+    ax.text(
+        0.98, 0.96, f"Weighted slope\n{b:.1f} pp per exposure unit",
+        transform=ax.transAxes, ha="right", va="top", color=INK, fontsize=10,
+        linespacing=1.35,
+        bbox={"boxstyle": "round,pad=0.55", "facecolor": "white",
+              "edgecolor": "#d8d9df", "linewidth": 0.8},
+    )
+    add_header(
+        fig,
+        "More-exposed occupations show a larger decline",
+        "Change in age 20-29 employment share, 2022-2025; each circle is one occupation",
+        left=0.09,
+    )
+    add_footer(
+        fig,
+        "Circle area reflects recent employment. Positive-exposure occupations only.",
+        left=0.09,
+    )
 
     if synth:
         ax.text(0.5, 0.5, "SYNTHETIC DATA\nNOT A FINDING", transform=ax.transAxes,
@@ -65,8 +82,8 @@ def main(allow_synthetic: bool = False):
     else:
         out = FIGURES / "young_worker_effect.png"
 
-    fig.tight_layout()
-    fig.savefig(out, bbox_inches="tight")
+    fig.subplots_adjust(left=0.12, right=0.97, bottom=0.14, top=0.79)
+    save_chart(fig, out)
     print(f"Saved {out}" + ("  [SYNTHETIC -- not a result]" if synth else ""))
 
 

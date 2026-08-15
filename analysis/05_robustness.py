@@ -13,6 +13,12 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import FIGURES, PROCESSED  # noqa: E402
 from src.data_guard import guard_publication  # noqa: E402
+from src.plot_style import (  # noqa: E402
+    ACCENT, BLUE, MUTE, add_footer, add_header, apply_chart_style, save_chart,
+    style_axes,
+)
+
+apply_chart_style()
 
 AGE_BANDS = ["20-24", "25-29", "30-39", "40-54", "55+"]
 YOUNG = {"20-24", "25-29"}
@@ -144,29 +150,32 @@ def main(post_from: int = 2024, allow_synthetic: bool = False) -> None:
     plot = age.copy()
     plot["coefficient_pp"] = plot["coefficient"] * 100
     plot["ci"] = 1.96 * plot["std_error"] * 100
-    fig, ax = plt.subplots(figsize=(8.8, 5.5), dpi=150)
-    colors = ["#c53b2f", "#d9786f", "#668fb8", "#8f919e", "#8f919e"]
+    fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
+    colors = [ACCENT, "#d9786f", BLUE, MUTE, MUTE]
     ax.barh(plot["age_band"], plot["coefficient_pp"], xerr=plot["ci"],
             color=colors, alpha=0.9, capsize=4)
     ax.axvline(0, color="#4a4d59", linewidth=1)
     ax.invert_yaxis()
-    ax.set_xlabel("Exposure × post coefficient (percentage points)")
-    ax.set_ylabel("Age band")
-    ax.grid(axis="x", color="#e6e6eb", linewidth=0.8)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
+    ax.set_xlabel("Coefficient (percentage points)")
+    ax.set_ylabel("")
+    style_axes(ax, grid_axis="x")
     if synthetic:
         ax.text(0.5, 0.5, "SYNTHETIC DATA\nNOT A FINDING",
                 transform=ax.transAxes, fontsize=28, color="red", alpha=0.28,
                 ha="center", va="center", rotation=18, fontweight="bold")
-    fig.suptitle("Younger coefficients are negative, but imprecise",
-                 x=0.13, y=0.98, ha="left", fontsize=17,
-                 fontweight="bold", color="#1b1d2b")
-    fig.text(0.13, 0.92, "Separate two-way fixed-effects models; 95% CI",
-             ha="left", color="#6f7280", fontsize=10)
-    fig.subplots_adjust(left=0.13, right=0.98, bottom=0.14, top=0.82)
-    fig.savefig(FIGURES / f"age_heterogeneity{suffix}.png", bbox_inches="tight")
-    plt.close(fig)
+    add_header(
+        fig,
+        "Age pattern is suggestive, not precise",
+        "Exposure x post-2024 coefficients from separate two-way fixed-effects models",
+        left=0.12,
+    )
+    add_footer(
+        fig,
+        "Bars show point estimates; whiskers show 95% confidence intervals.",
+        left=0.12,
+    )
+    fig.subplots_adjust(left=0.13, right=0.98, bottom=0.16, top=0.79)
+    save_chart(fig, FIGURES / f"age_heterogeneity{suffix}.png")
 
 
 if __name__ == "__main__":
